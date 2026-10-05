@@ -1,9 +1,7 @@
 // Calendar dates are plain "YYYY-MM-DD" strings. All arithmetic is done in UTC
 // so the phone's time zone and daylight saving can never shift a date by a day.
 
-// Developer switch: set to e.g. '2026-10-10' to pretend today is that date
-// (useful for testing late periods). Keep null for normal use.
-const DEV_TODAY: string | null = null;
+import { todayLocal } from '../lib/cycleEngine';
 
 const MS_PER_DAY = 86400000;
 
@@ -59,6 +57,7 @@ export function keyToLocalDate(key: string): Date {
   return new Date(p.y, p.m - 1, p.d);
 }
 
+// One source for "today" (the DEV_TODAY switch lives in lib/cycleEngine.ts)
 export function getToday(): string {
-  return DEV_TODAY ?? dateToKey(new Date());
+  return todayLocal();
 }

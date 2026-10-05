@@ -111,8 +111,13 @@ export function addDays(d: DateStr, n: number): DateStr {
 export function diffDays(a: DateStr, b: DateStr): number {
   return Math.round((toUTC(a) - toUTC(b)) / DAY_MS);
 }
-/** Today in the phone's local time zone */
+// Developer switch: set to e.g. '2026-10-10' to pretend today is that date
+// (useful for testing late periods). Keep null for normal use.
+const DEV_TODAY: DateStr | null = null;
+
+/** Today in the phone's local time zone (or DEV_TODAY when testing) */
 export function todayLocal(): DateStr {
+  if (DEV_TODAY) return DEV_TODAY;
   const n = new Date();
   return `${n.getFullYear()}-${pad(n.getMonth() + 1)}-${pad(n.getDate())}`;
 }
