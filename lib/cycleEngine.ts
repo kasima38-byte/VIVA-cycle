@@ -312,3 +312,80 @@ export function predictCycles(est: CycleEstimate, count: number): PredictedCycle
 export function createInitialLogs(lastPeriodStart: DateStr): PeriodLog[] {
   return [{ start: lastPeriodStart }];
 }
+
+// ---------- Confirmed period history (Prompt 4) ----------
+
+/** Starts closer together than this are treated as a mistake, not a new cycle (same limit the engine uses for valid cycles). */
+export const MIN_DAYS_BETWEEN_PERIODS = VALID_CYCLE.min;
+
+export function isValidDate(d: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
+  return fromUTC(toUTC(d)) === d; // rejects 30 Feb, month 13, etc.
+}
+
+export interface CompletedCycle {
+  start: DateStr;      // confirmed period start
+  nextStart: DateStr;  // the following confirmed start
+  length: number;      // nextStart − start (NOT bleeding days)
+}
+
+/** Every finished cycle, oldest first. Observed facts — the baseline never overwrites them. */
+export function completedCycles(logs: PeriodLog[]): CompletedCycle[] {
+  const starts = Array.from(new Set(logs.map(l => l.start))).sort();
+  const out: CompletedCycle[] = [];
+  for (let i = 1; i < starts.length; i++) {
+    out.push({ start: starts[i - 1], nextStart: starts[i], length: diffDays(starts[i], starts[i - 1]) });
+  }
+  return out;
+}
+
+export type PeriodLogResult =
+  | { kind: 'added'; completedCycle: number | null }  // length of the cycle this start just ended
+  | { kind: 'replaced'; replaced: DateStr }
+  | { kind: 'duplicate' }
+  | { kind: 'future' }
+  | { kind: 'invalid' }
+  | { kind: 'tooClose'; existing: DateStr; daysApart: number };
+
+const sortLogs = (logs: PeriodLog[]) => [...logs].sort((a, b) => a.start.localeCompare(b.start));
+
+function checkStart(
+  logs: PeriodLog[], date: DateStr, today: DateStr, ignore?: DateStr
+): PeriodLogResult | null {
+  if (!isValidDate(date)) return { kind: 'invalid' };
+  if (diffDays(date, today) > 0) return { kind: 'future' };
+  const others = logs.filter(l => l.start !== ignore);
+  if (others.some(l => l.start === date)) return { kind: 'duplicate' };
+  const near = others
+    .map(l => ({ start: l.start, gap: Math.abs(diffDays(date, l.start)) }))
+    .filter(x => x.gap < MIN_DAYS_BETWEEN_PERIODS)
+    .sort((a, b) => a.gap - b.gap)[0];
+  if (near) return { kind: 'tooClose', existing: near.start, daysApart: near.gap };
+  return null; // OK
+}
+
+/**
+ * Log an ACTUAL period start. Returns the new history (unchanged unless added).
+ * Never creates duplicates; never touches other confirmed records.
+ */
+export function applyPeriodLog(
+  logs: PeriodLog[], date: DateStr, today: DateStr = todayLocal()
+): { result: PeriodLogResult; logs: PeriodLog[] } {
+  const problem = checkStart(logs, date, today);
+  if (problem) return { result: problem, logs };
+  const next = sortLogs([...logs, { start: date }]);
+  const i = next.findIndex(l => l.start === date);
+  const completedCycle = i > 0 ? diffDays(date, next[i - 1].start) : null;
+  return { result: { kind: 'added', completedCycle }, logs: next };
+}
+
+/** Correct a wrongly entered start: the old date is removed, the new one takes its place. */
+export function applyPeriodCorrection(
+  logs: PeriodLog[], oldStart: DateStr, newStart: DateStr, today: DateStr = todayLocal()
+): { result: PeriodLogResult; logs: PeriodLog[] } {
+  if (!logs.some(l => l.start === oldStart)) return { result: { kind: 'invalid' }, logs };
+  const problem = checkStart(logs, newStart, today, oldStart);
+  if (problem) return { result: problem, logs };
+  const next = sortLogs([...logs.filter(l => l.start !== oldStart), { start: newStart }]);
+  return { result: { kind: 'replaced', replaced: oldStart }, logs: next };
+}

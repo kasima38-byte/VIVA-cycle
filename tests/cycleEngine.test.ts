@@ -1,7 +1,10 @@
 // VIVA Cycle — engine, calendar and Home tests (no phone needed)
 // Run with:  npx tsx tests/cycleEngine.test.ts
 // Other time zones:  TZ=Africa/Kampala npx tsx tests/cycleEngine.test.ts
-import { addDays, calculateCycle, CycleBaseline, diffDays, PeriodLog, Regularity } from '../lib/cycleEngine';
+import {
+  addDays, applyPeriodCorrection, applyPeriodLog, calculateCycle, completedCycles,
+  CycleBaseline, diffDays, PeriodLog, Regularity,
+} from '../lib/cycleEngine';
 import { buildCalendarMonth } from '../constants/calendarModel';
 import { dateToKey, isValidDateKey, keyToLocalDate } from '../constants/dateUtils';
 import { getHomeSummary } from '../constants/homeData';
@@ -143,6 +146,79 @@ group('Dates and time zones');
   eq(dateToKey(new Date(2026, 9, 3, 23, 59)), '2026-10-03', 'local 23:59 is still 3 Oct');
   eq(dateToKey(keyToLocalDate('2026-10-03')), '2026-10-03', 'key → Date → key round trip');
   eq(isValidDateKey('2026-02-30'), false, '30 Feb is rejected');
+}
+
+group('Prompt 4 · TEST A  On-time period (3 Oct)');
+{
+  const r = applyPeriodLog(logs('2026-09-05'), '2026-10-03', '2026-10-03');
+  eq(r.result, { kind: 'added', completedCycle: 28 }, 'added, completed cycle 28 days');
+  const e = est(B(28, 5), r.logs, '2026-10-03');
+  eq([e.currentCycleStart, e.currentCycleDay], ['2026-10-03', 1], '3 Oct = confirmed Cycle Day 1');
+}
+
+group('Prompt 4 · TEST B  Late period (8 Oct)');
+{
+  const r = applyPeriodLog(logs('2026-09-05'), '2026-10-08', '2026-10-08');
+  eq(r.result, { kind: 'added', completedCycle: 33 }, 'completed cycle 33 days');
+  eq(r.logs.map((l) => l.start), ['2026-09-05', '2026-10-08'], 'no fake 3 Oct period created');
+  const e = est(B(28, 5), r.logs, '2026-10-08');
+  eq(e.currentCycleDay, 1, '8 Oct = Cycle Day 1');
+  eq(e.estimatedNextPeriod, '2026-11-05', 'next prediction from 8 Oct');
+  eq(marked(2026, 9, r.logs, e, '2026-10-08', 'isPredictedPeriod'), [], 'old 3–7 Oct prediction is gone');
+  eq(marked(2026, 9, r.logs, e, '2026-10-08', 'isPeriod'), [8, 9, 10, 11, 12], 'one confirmed period from 8 Oct');
+}
+
+group('Prompt 4 · TEST C  Early period (30 Sep)');
+{
+  const r = applyPeriodLog(logs('2026-09-05'), '2026-09-30', '2026-09-30');
+  eq(r.result, { kind: 'added', completedCycle: 25 }, 'completed cycle 25 days');
+  const e = est(B(28, 5), r.logs, '2026-09-30');
+  eq([e.currentCycleStart, e.estimatedNextPeriod], ['2026-09-30', '2026-10-28'], 'predictions recalculated from 30 Sep');
+}
+
+group('Prompt 4 · TEST D  No period logged');
+{
+  const l = logs('2026-09-05');
+  est(B(28, 5), l, '2026-10-10');
+  eq(l.map((x) => x.start), ['2026-09-05'], 'passing the predicted dates creates no confirmed period');
+}
+
+group('Prompt 4 · TEST E  Duplicates, future and close dates');
+{
+  const first = applyPeriodLog(logs('2026-09-05'), '2026-10-06', '2026-10-06');
+  const again = applyPeriodLog(first.logs, '2026-10-06', '2026-10-06');
+  eq(again.result.kind, 'duplicate', 'second 6 Oct is refused');
+  eq(again.logs.length, 2, 'still only two records');
+  eq(applyPeriodLog(logs('2026-09-05'), '2026-10-20', '2026-10-06').result.kind, 'future', 'future date refused');
+  eq(applyPeriodLog(logs('2026-09-05'), '2026-02-30', '2026-10-06').result.kind, 'invalid', 'impossible date refused');
+  eq(applyPeriodLog(first.logs, '2026-10-05', '2026-10-06').result,
+    { kind: 'tooClose', existing: '2026-10-06', daysApart: 1 }, '5 Oct next to 6 Oct is flagged as a likely mistake');
+}
+
+group('Prompt 4 · Correction (5 Oct logged by mistake → 6 Oct)');
+{
+  const wrong = applyPeriodLog(logs('2026-09-05'), '2026-10-05', '2026-10-07').logs;
+  const fixed = applyPeriodCorrection(wrong, '2026-10-05', '2026-10-06', '2026-10-07');
+  eq(fixed.result, { kind: 'replaced', replaced: '2026-10-05' }, 'replaced');
+  eq(fixed.logs.map((l) => l.start), ['2026-09-05', '2026-10-06'], 'old date gone, no duplicate');
+  eq(est(B(28, 5), fixed.logs, '2026-10-07').currentCycleDay, 2, 'cycle day recalculated (7 Oct = day 2)');
+}
+
+group('Prompt 4 · TEST F  History');
+{
+  const h = logs('2026-09-05', '2026-10-06', '2026-11-04');
+  eq(completedCycles(h).map((c) => c.length), [31, 29], 'completed cycles 31 and 29 days');
+  eq(h.length, 3, 'all three records kept');
+  const e = est(B(28, 5), h, '2026-11-10');
+  eq([e.lengthSource, e.cycleLengthUsed], ['history', 30], 'two real cycles → predictions use her history (30)');
+  eq(est(B(35, 5), h, '2026-11-10').cycleLengthUsed, 30, 'baseline setting does not overwrite observed history');
+  eq(marked(2026, 10, h, e, '2026-11-10', 'isPredictedPeriod'), [], 'no stale November prediction around the logged 4 Nov');
+}
+
+group('Prompt 4 · Year boundary');
+{
+  const r = applyPeriodLog(logs('2026-12-10'), '2027-01-08', '2027-01-08');
+  eq(r.result, { kind: 'added', completedCycle: 29 }, '10 Dec → 8 Jan = 29 days');
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');

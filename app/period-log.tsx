@@ -1,14 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateFieldCard from '../components/DateFieldCard';
 import FlowIntensityCard from '../components/FlowIntensityCard';
 import NotesInput from '../components/NotesInput';
 import SymptomRow from '../components/SymptomRow';
 import { todayLocal } from '../lib/cycleEngine';
-import { addPeriodStart } from '../lib/vivaStore';
+import { formatLongDate } from '../constants/cycleData';
+import { PeriodLogResult } from '../lib/cycleEngine';
+import { correctPeriodStart, logPeriod } from '../lib/vivaStore';
 import { colors, radius, spacing } from '../constants/theme';
 
 type Flow = 'light' | 'moderate' | 'heavy' | 'veryHeavy';
@@ -42,10 +44,43 @@ export default function PeriodLogScreen() {
     setSymptoms((prev) => (prev.includes(key) ? prev.filter((s) => s !== key) : [...prev, key]));
   };
 
+  // Shows what happened; returns true when the history was changed.
+  const explain = (r: PeriodLogResult, date: string): boolean => {
+    switch (r.kind) {
+      case 'added':
+      case 'replaced':
+        return true;
+      case 'duplicate':
+        Alert.alert('Already logged', 'A period starting ' + formatLongDate(date) + ' is already saved.');
+        return false;
+      case 'future':
+        Alert.alert('That date is in the future', 'You can only log a period that has already started.');
+        return false;
+      case 'invalid':
+        Alert.alert('Please check the date', 'That date could not be saved.');
+        return false;
+      case 'tooClose':
+        Alert.alert(
+          'Is this a correction?',
+          'You already logged a period starting ' + formatLongDate(r.existing) + ', only ' + r.daysApart +
+            (r.daysApart === 1 ? ' day' : ' days') + ' apart. If that date was wrong, you can replace it.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Replace ' + formatLongDate(r.existing),
+              onPress: () => {
+                if (explain(correctPeriodStart(r.existing, date), date)) router.back();
+              },
+            },
+          ]
+        );
+        return false;
+    }
+  };
+
   const handleSave = () => {
-    // Confirmed period start → becomes the new Cycle Day 1; older logs are kept.
-    addPeriodStart(dateKey);
-    router.back();
+    // An ACTUAL period start: becomes Cycle Day 1 if it is the latest; older logs are kept.
+    if (explain(logPeriod(dateKey), dateKey)) router.back();
   };
   
   return (

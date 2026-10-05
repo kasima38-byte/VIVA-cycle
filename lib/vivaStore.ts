@@ -7,7 +7,10 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSyncExternalStore } from 'react';
-import { CycleBaseline, DateStr, Goal, PeriodLog, createInitialLogs } from './cycleEngine';
+import {
+  CycleBaseline, DateStr, Goal, PeriodLog, PeriodLogResult,
+  applyPeriodCorrection, applyPeriodLog, createInitialLogs,
+} from './cycleEngine';
 
 const STORAGE_KEY = 'viva-cycle:data';
 const SCHEMA_VERSION = 1;
@@ -126,10 +129,18 @@ export function completeSetup(input: SetupInput) {
   });
 }
 
-/** Add a confirmed period start. Never changes other logs. */
-export function addPeriodStart(start: DateStr) {
-  if (state.periods.some((p) => p.start === start)) return;
-  update({ periods: sortPeriods([...state.periods, { start }]) });
+/** Log an ACTUAL period start (becomes Cycle Day 1 if it is the latest). Never changes other logs. */
+export function logPeriod(start: DateStr): PeriodLogResult {
+  const { result, logs } = applyPeriodLog(state.periods, start);
+  if (result.kind === 'added') update({ periods: logs });
+  return result;
+}
+
+/** Fix a wrongly entered start date: the old record is replaced, never duplicated. */
+export function correctPeriodStart(oldStart: DateStr, newStart: DateStr): PeriodLogResult {
+  const { result, logs } = applyPeriodCorrection(state.periods, oldStart, newStart);
+  if (result.kind === 'replaced') update({ periods: logs });
+  return result;
 }
 
 /** Settings change: affects future predictions only, never period history. */
