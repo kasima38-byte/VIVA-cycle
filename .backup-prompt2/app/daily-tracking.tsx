@@ -9,7 +9,6 @@ import EnergySlider from '../components/EnergySlider';
 import MoodSelector, { MoodValue } from '../components/MoodSelector';
 import TrackingCard from '../components/TrackingCard';
 import { colors, radius, spacing } from '../constants/theme';
-import { dateToKey, getToday, keyToLocalDate } from '../constants/dateUtils';
 import { saveDailyLog } from '../constants/cycleStore';
 
 const WEEKDAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -22,7 +21,7 @@ function buildWeek(centerDate: Date, dotDays: number[]): DateItem[] {
     const d = new Date(start);
     d.setDate(start.getDate() + i);
     items.push({
-      key: dateToKey(d),
+      key: d.toISOString().slice(0, 10),
       weekday: WEEKDAY_NAMES[d.getDay()],
       day: d.getDate(),
       hasDot: dotDays.includes(d.getDate()),
@@ -32,9 +31,9 @@ function buildWeek(centerDate: Date, dotDays: number[]): DateItem[] {
 }
 
 export default function DailyTrackingScreen() {
-  const [centerDate, setCenterDate] = useState(keyToLocalDate(getToday()));
+  const [centerDate, setCenterDate] = useState(new Date(2026, 8, 17));
   const dates = useMemo(() => buildWeek(centerDate, [15, 16, 18]), [centerDate]);
-  const [selectedKey, setSelectedKey] = useState(dateToKey(centerDate));
+  const [selectedKey, setSelectedKey] = useState(centerDate.toISOString().slice(0, 10));
 
   const [mood, setMood] = useState<MoodValue>('good');
   const [energy, setEnergy] = useState(50);

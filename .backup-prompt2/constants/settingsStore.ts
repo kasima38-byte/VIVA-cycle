@@ -1,22 +1,17 @@
 import { useSyncExternalStore } from 'react';
 
 export type Goal = 'conceive' | 'avoid' | null;
-export type Regularity = 'regular' | 'irregular' | 'unknown';
 
-// Baseline preferences. These shape FUTURE predictions only.
-// They are never used to rewrite logged period history.
 export type Settings = {
   goal: Goal;
-  cycleLength: number | null; // null = "I don't know", which is different from a real length
+  cycleLength: number; // typical length, used until enough periods are logged
   periodLength: number;
-  cycleRegularity: Regularity;
 };
 
 let settings: Settings = {
   goal: null,
-  cycleLength: null,
+  cycleLength: 28,
   periodLength: 5,
-  cycleRegularity: 'unknown',
 };
 
 const listeners = new Set<() => void>();

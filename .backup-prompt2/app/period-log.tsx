@@ -7,8 +7,7 @@ import DateFieldCard from '../components/DateFieldCard';
 import FlowIntensityCard from '../components/FlowIntensityCard';
 import NotesInput from '../components/NotesInput';
 import SymptomRow from '../components/SymptomRow';
-import { todayLocal } from '../lib/cycleEngine';
-import { addPeriodStart } from '../lib/vivaStore';
+import { logPeriodStart } from '../constants/cycleStore';
 import { colors, radius, spacing } from '../constants/theme';
 
 type Flow = 'light' | 'moderate' | 'heavy' | 'veryHeavy';
@@ -33,7 +32,7 @@ const symptomOptions: { key: string; label: string; icon: React.ComponentProps<t
 ];
 
 export default function PeriodLogScreen() {
-  const [dateKey, setDateKey] = useState(todayLocal());
+  const [dateKey, setDateKey] = useState(new Date().toISOString().slice(0, 10));
   const [flow, setFlow] = useState<Flow>('light');
   const [symptoms, setSymptoms] = useState<string[]>([]);
   const [notes, setNotes] = useState('');
@@ -42,9 +41,15 @@ export default function PeriodLogScreen() {
     setSymptoms((prev) => (prev.includes(key) ? prev.filter((s) => s !== key) : [...prev, key]));
   };
 
+  const flowMap: Record<Flow, 'light' | 'medium' | 'heavy' | 'spotting'> = {
+    light: 'light',
+    moderate: 'medium',
+    heavy: 'heavy',
+    veryHeavy: 'heavy',
+  };
+
   const handleSave = () => {
-    // Confirmed period start → becomes the new Cycle Day 1; older logs are kept.
-    addPeriodStart(dateKey);
+    logPeriodStart(dateKey, flowMap[flow]);
     router.back();
   };
   

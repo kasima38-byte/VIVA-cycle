@@ -36,6 +36,25 @@ export interface DateRange {
   end: DateStr;
 }
 
+export type FertilityStatus =
+  | 'menstruation'
+  | 'lowerFertility'
+  | 'fertileApproaching'
+  | 'potentiallyFertile'
+  | 'ovulationLikely'
+  | 'ovulationMayHavePassed'
+  | 'postOvulatory'
+  | 'periodExpectedSoon';
+
+/** One predicted cycle, for drawing the calendar. All values are ESTIMATES. */
+export interface PredictedCycle {
+  periodStart: DateStr;
+  periodEnd: DateStr;
+  ovulation: DateStr;
+  fertileStart: DateStr;
+  fertileEnd: DateStr;
+}
+
 export interface CycleEstimate {
   currentCycleStart: DateStr;
   currentCycleDay: number;
@@ -43,20 +62,25 @@ export interface CycleEstimate {
   periodLengthUsed: number;
   lengthSource: 'history' | 'baseline' | 'default';
   estimatedNextPeriod: DateStr;
+  /** Predicted bleeding days: next period start → start + period length − 1 */
   estimatedPeriodWindow: DateRange;
+  /** Uncertainty range for the next period START (± regularity margin) */
+  nextPeriodRange: DateRange;
+  daysToNextPeriod: number;   // negative when late
   estimatedOvulation: DateStr;
   estimatedFertileWindow: DateRange;
   isLate: boolean;   // past the estimated date with no new log
   daysLate: number;
   confidence: 'low' | 'medium' | 'high';
+  status: FertilityStatus;
 }
 
 // ---------- Defaults & limits ----------
 
 const DEFAULT_CYCLE = 28;
 const DEFAULT_PERIOD = 5;
-const LUTEAL_DAYS = 14;          // ovulation ≈ next period − 14
-const FERTILE_BEFORE = 5;        // sperm survival: window = ovulation − 5 … ovulation (6 days)
+export const LUTEAL_DAYS = 14;          // ovulation ≈ next period − 14
+export const FERTILE_BEFORE = 5;        // sperm survival: window = ovulation − 5 … ovulation (6 days)
 const MAX_HISTORY_CYCLES = 6;
 const VALID_CYCLE = { min: 15, max: 90 };   // outside this = likely a missed/duplicate log
 const VALID_PERIOD = { min: 1, max: 14 };
@@ -194,6 +218,10 @@ export function calculateCycle(
   // 4. Predictions (output only)
   const estimatedNextPeriod = addDays(currentCycleStart, cycleLengthUsed);
   const estimatedPeriodWindow: DateRange = {
+    start: estimatedNextPeriod,
+    end: addDays(estimatedNextPeriod, periodLengthUsed - 1),
+  };
+  const nextPeriodRange: DateRange = {
     start: addDays(estimatedNextPeriod, -margin),
     end: addDays(estimatedNextPeriod, margin),
   };
@@ -218,6 +246,22 @@ export function calculateCycle(
     confidence = 'medium';
   else confidence = 'low';
 
+  const daysToNextPeriod = diffDays(estimatedNextPeriod, today);
+  const toOvulation = diffDays(estimatedOvulation, today);
+  const toWindowStart = diffDays(fertileStart, today);
+  const currentLog = logs.find(l => l.start === currentCycleStart);
+  const bleedingDays = currentLog?.end ? diffDays(currentLog.end, currentCycleStart) + 1 : periodLengthUsed;
+
+  let status: FertilityStatus;
+  if (currentCycleDay <= bleedingDays) status = 'menstruation';
+  else if (daysToNextPeriod <= 3) status = 'periodExpectedSoon';
+  else if (toOvulation === 0 || toOvulation === 1) status = 'ovulationLikely';
+  else if (toOvulation >= 2 && toOvulation <= FERTILE_BEFORE) status = 'potentiallyFertile';
+  else if (toWindowStart > 0 && toWindowStart <= 3) status = 'fertileApproaching';
+  else if (toOvulation === -1 || toOvulation === -2) status = 'ovulationMayHavePassed';
+  else if (toOvulation < -2) status = 'postOvulatory';
+  else status = 'lowerFertility';
+
   return {
     currentCycleStart,
     currentCycleDay,
@@ -226,12 +270,35 @@ export function calculateCycle(
     lengthSource,
     estimatedNextPeriod,
     estimatedPeriodWindow,
+    nextPeriodRange,
+    daysToNextPeriod,
     estimatedOvulation,
     estimatedFertileWindow: { start: fertileStart, end: fertileEnd },
     isLate,
     daysLate,
     confidence,
+    status,
   };
+}
+
+/**
+ * Predicted cycles from the current confirmed start: cycle 0 is the period
+ * that ends the current cycle, then the ones after it. Estimates only.
+ */
+export function predictCycles(est: CycleEstimate, count: number): PredictedCycle[] {
+  const out: PredictedCycle[] = [];
+  for (let k = 1; k <= count; k++) {
+    const periodStart = addDays(est.currentCycleStart, k * est.cycleLengthUsed);
+    const ovulation = addDays(periodStart, -LUTEAL_DAYS);
+    out.push({
+      periodStart,
+      periodEnd: addDays(periodStart, est.periodLengthUsed - 1),
+      ovulation,
+      fertileStart: addDays(ovulation, -FERTILE_BEFORE),
+      fertileEnd: ovulation,
+    });
+  }
+  return out;
 }
 
 /** Call when setup is completed: the user's last period start becomes the first confirmed log. */

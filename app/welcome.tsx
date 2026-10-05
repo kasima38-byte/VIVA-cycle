@@ -11,7 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle, G, Path } from 'react-native-svg';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import {
-  CycleBaseline, Regularity, DateStr,
+  CycleBaseline, Regularity, DateStr, Goal,
   validateSetup, createInitialLogs, calculateCycle,
 } from '../lib/cycleEngine';
 import { router } from 'expo-router';
@@ -61,6 +61,14 @@ const REGULARITY: { value: Regularity; label: string }[] = [
   { value: 'regular', label: 'Regular' },
   { value: 'somewhat_irregular', label: 'Somewhat\nirregular' },
   { value: 'irregular', label: 'Irregular' },
+  { value: 'not_sure', label: 'Not sure' },
+];
+
+const GOALS: { value: Goal; label: string }[] = [
+  { value: 'understand', label: 'Understand\nmy cycle' },
+  { value: 'track', label: 'Track\nmy cycle' },
+  { value: 'conceive', label: 'Try to get\npregnant' },
+  { value: 'avoid', label: 'Avoid\npregnancy' },
 ];
 
 export interface WelcomeSetupData {
@@ -68,6 +76,7 @@ export interface WelcomeSetupData {
   dateOfBirth: DateStr | null;
   lastPeriodStart: DateStr;
   baseline: CycleBaseline;
+  goal: Goal;
 }
 
 type DateTarget = 'dob' | 'lmp';
@@ -85,6 +94,7 @@ export default function WelcomeSetupScreen({
   const [cycleLength, setCycleLength] = useState<number | null>(28);
   const [periodLength, setPeriodLength] = useState<number | null>(5);
   const [regularity, setRegularity] = useState<Regularity>('regular');
+  const [goal, setGoal] = useState<Goal | null>(null);
 
   const [pickerFor, setPickerFor] = useState<DateTarget | null>(null);
   const [tempDate, setTempDate] = useState<Date>(new Date());
@@ -122,20 +132,20 @@ export default function WelcomeSetupScreen({
 
   const handleContinue = () => {
     const baseline: CycleBaseline = { cycleLength, periodLength, regularity };
-    // Goal is chosen on the next screen; validation doesn't use it.
     const problems = lmp
-      ? validateSetup({ name, baseline, goal: 'track' }, lmp)
+      ? validateSetup({ name, baseline, goal: goal ?? 'track' }, lmp)
       : [
           ...(name.trim() ? [] : ['Please enter your name.']),
           'Please select when your last period started.',
         ];
+    if (!goal) problems.push('Please choose your goal.');
 
-    if (problems.length > 0 || !lmp) {
+    if (problems.length > 0 || !lmp || !goal) {
       setErrors(problems);
       return;
     }
 
-    const data: WelcomeSetupData = { name: name.trim(), dateOfBirth: dob, lastPeriodStart: lmp, baseline };
+    const data: WelcomeSetupData = { name: name.trim(), dateOfBirth: dob, lastPeriodStart: lmp, baseline, goal };
 
     if (onContinue) {
       onContinue(data);
@@ -154,7 +164,8 @@ export default function WelcomeSetupScreen({
       Alert.alert(
         `Hi ${data.name}`,
         `Cycle day ${est.currentCycleDay}\n` +
-          `Estimated next period: ${formatDate(est.estimatedNextPeriod)}\n` +
+          `Estimated next period: ${formatDate(est.estimatedPeriodWindow.start)} – ${formatDate(est.estimatedPeriodWindow.end)}\n` +
+          `Estimated ovulation: ${formatDate(est.estimatedOvulation)}\n` +
           `Estimated fertile window: ${formatDate(est.estimatedFertileWindow.start)} – ${formatDate(est.estimatedFertileWindow.end)}`,
         [{ text: 'OK', onPress: goHome }]
       );
@@ -225,6 +236,24 @@ export default function WelcomeSetupScreen({
                     accessibilityState={{ selected }}
                   >
                     <Text style={[s.chipText, selected && s.chipTextSel]}>{r.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Text style={s.label}>What is your main goal?</Text>
+            <View style={s.goalChips}>
+              {GOALS.map(g => {
+                const selected = g.value === goal;
+                return (
+                  <Pressable
+                    key={g.value}
+                    onPress={() => { setGoal(g.value); setErrors([]); }}
+                    style={[s.chip, s.goalChip, selected && s.chipSel]}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                  >
+                    <Text style={[s.chipText, selected && s.chipTextSel]}>{g.label}</Text>
                   </Pressable>
                 );
               })}
@@ -459,8 +488,10 @@ const s = StyleSheet.create({
     backgroundColor: C.chipBg, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6,
   },
   chipSel: { backgroundColor: C.chipSelBg, borderColor: C.chipSelBorder, borderWidth: 1.5 },
-  chipText: { fontSize: 15, lineHeight: 19, color: C.text, textAlign: 'center' },
+  chipText: { fontSize: 14, lineHeight: 18, color: C.text, textAlign: 'center' },
   chipTextSel: { color: C.primaryDeep, fontWeight: '600' },
+  goalChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  goalChip: { flexGrow: 1, flexBasis: '45%' },
 
   footer: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8, backgroundColor: C.bg },
   errorBox: { marginBottom: 10, paddingHorizontal: 8 },
@@ -473,7 +504,7 @@ const s = StyleSheet.create({
   buttonText: { color: '#FFFFFF', fontSize: 21, fontWeight: '600' },
 
   modalRoot: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(19,22,51,0.35)' },
+  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(19,22,51,0.35)' },
   sheet: {
     backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24,
     paddingHorizontal: 20, paddingTop: 16, paddingBottom: 34,

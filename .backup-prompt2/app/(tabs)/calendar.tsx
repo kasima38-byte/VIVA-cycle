@@ -9,40 +9,43 @@ import CycleInsightsSection from '../../components/CycleInsightsSection';
 import MonthSelector from '../../components/MonthSelector';
 import SettingsRow from '../../components/SettingsRow';
 import TipCard from '../../components/TipCard';
-import { monthLabel } from '../../constants/cycleData';
+import {
+  buildMonthGrid,
+  cycleState,
+  daysUntil,
+  formatLongDate,
+  monthLabel,
+} from '../../constants/cycleData';
 import { buildCalendarMonth } from '../../constants/calendarModel';
+import { estimateCycle } from '../../constants/cycleEngine';
+import { useSettings } from '../../constants/settingsStore';
 import { useCycleLog } from '../../constants/cycleStore';
 import { colors, spacing } from '../../constants/theme';
-import { calculateCycle, todayLocal } from '../../lib/cycleEngine';
-import { useVivaStore } from '../../lib/vivaStore';
 
 export default function CalendarScreen() {
-  const today = todayLocal();
   const todayDate = useMemo(() => {
-    const [y, m, d] = today.split('-').map(Number);
-    return new Date(y, m - 1, d);
-  }, [today]);
+    const parts = cycleState.today.split('-').map(Number);
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+  }, []);
 
-  // Single source of truth: saved setup + confirmed periods → the one engine
-  const viva = useVivaStore();
+  const cycleLog = useCycleLog();
+  const settings = useSettings();
   const est = useMemo(
-    () => calculateCycle(viva.baseline, viva.periods, today),
-    [viva.baseline, viva.periods, today]
+    () => estimateCycle(cycleLog.periods, settings.periodLength, cycleState.today, settings.cycleLength),
+    [cycleLog, settings]
   );
-
-  // Sexual-activity markers still come from the older log store (unchanged)
-  const sexLog = useCycleLog();
-  const sexDates = useMemo(
-    () => sexLog.sexualActivity.filter((e) => e.hadActivity).map((e) => e.date),
-    [sexLog]
-  );
+  const derived = {
+    fertileWindow: est.fertileWindow,
+    ovulationDate: est.ovulation,
+    nextPeriod: est.nextPeriod,
+  };
 
   const [year, setYear] = useState(todayDate.getFullYear());
   const [monthIndex, setMonthIndex] = useState(todayDate.getMonth());
 
   const days = useMemo(
-    () => buildCalendarMonth(year, monthIndex, viva.periods, est, sexDates, today),
-    [year, monthIndex, viva.periods, est, sexDates, today]
+    () => buildCalendarMonth(year, monthIndex, cycleLog, settings, cycleState.today),
+    [year, monthIndex, cycleLog, settings]
   );
 
   const goPrevMonth = () => {
@@ -67,6 +70,8 @@ export default function CalendarScreen() {
     setYear(todayDate.getFullYear());
     setMonthIndex(todayDate.getMonth());
   };
+
+  const nextPeriodInDays = daysUntil(cycleState.nextPeriod);
 
   return (
     <View style={styles.root}>
@@ -95,12 +100,12 @@ export default function CalendarScreen() {
           </View>
 
           <CycleInsightsSection
-            today={today}
-            cycleLength={est ? est.cycleLengthUsed : 28}
-            periodLength={est ? est.periodLengthUsed : 5}
-            fertileWindow={est ? est.estimatedFertileWindow : null}
-            ovulationDate={est ? est.estimatedOvulation : null}
-            nextPeriod={est ? est.estimatedNextPeriod : null}
+            today={cycleState.today}
+            cycleLength={est.expectedCycleLength}
+            periodLength={settings.periodLength}
+            fertileWindow={derived.fertileWindow}
+            ovulationDate={derived.ovulationDate}
+            nextPeriod={derived.nextPeriod}
             onViewDetails={() => router.push('/fertility')}
           />
 

@@ -4,38 +4,81 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import BottomSheet from '../components/BottomSheet';
-import { Goal, updateSettings, useSettings } from '../constants/settingsStore';
 import { colors, radius, spacing } from '../constants/theme';
+import { Goal, Regularity } from '../lib/cycleEngine';
+import { setGoal, updateBaseline, useVivaStore } from '../lib/vivaStore';
 
-type Open = 'goal' | 'cycle' | 'period' | null;
+// Settings change the BASELINE only. Confirmed period history is never touched.
+
+type Open = 'goal' | 'cycle' | 'period' | 'regularity' | null;
+
+const CYCLE_RANGE = { min: 21, max: 45, fallback: 28 };   // same as Welcome
+const PERIOD_RANGE = { min: 2, max: 10, fallback: 5 };    // same as Welcome
 
 const GOAL_OPTIONS: { key: Goal; label: string; detail: string }[] = [
-  { key: 'conceive', label: 'Trying to conceive', detail: 'Focus on your estimated fertile window and timing.' },
-  { key: 'avoid', label: 'Avoiding pregnancy', detail: 'Focus on days that may be fertile. Estimates are not contraception.' },
-  { key: null, label: 'Not set', detail: 'Just track your cycle for now.' },
+  { key: 'understand', label: 'Understand my cycle', detail: 'Learn how your cycle works.' },
+  { key: 'track', label: 'Track my cycle', detail: 'Keep a record of your periods and patterns.' },
+  { key: 'conceive', label: 'Try to get pregnant', detail: 'Focus on your estimated fertile window and timing.' },
+  { key: 'avoid', label: 'Avoid pregnancy', detail: 'Focus on days that may be fertile. Estimates are not contraception.' },
 ];
 
-function goalLabel(goal: Goal) {
-  if (goal === 'conceive') return 'Trying to conceive';
-  if (goal === 'avoid') return 'Avoiding pregnancy';
-  return 'Not set';
-}
+const REGULARITY_OPTIONS: { key: Regularity; label: string; detail: string }[] = [
+  { key: 'regular', label: 'Regular', detail: 'Your cycle length is usually about the same.' },
+  { key: 'somewhat_irregular', label: 'Somewhat irregular', detail: 'Your cycle length sometimes changes.' },
+  { key: 'irregular', label: 'Irregular', detail: 'Your cycle length often changes.' },
+  { key: 'not_sure', label: 'Not sure', detail: 'That’s fine — logging periods will show your pattern.' },
+];
+
+const goalLabel = (g: Goal | null) => GOAL_OPTIONS.find((o) => o.key === g)?.label ?? 'Not set';
+const regularityLabel = (r: Regularity) => REGULARITY_OPTIONS.find((o) => o.key === r)?.label ?? 'Not sure';
+const daysLabel = (n: number | null) => (n === null ? 'Not sure' : n + ' days');
 
 export default function CycleSettingsScreen() {
-  const settings = useSettings();
+  const { baseline, goal } = useVivaStore();
   const [open, setOpen] = useState<Open>(null);
 
-  const step = (field: 'cycleLength' | 'periodLength', delta: number, min: number, max: number) => {
-    const next = Math.min(max, Math.max(min, settings[field] + delta));
-    updateSettings({ [field]: next });
+  const step = (field: 'cycleLength' | 'periodLength', delta: number) => {
+    const range = field === 'cycleLength' ? CYCLE_RANGE : PERIOD_RANGE;
+    const current = baseline[field] ?? range.fallback;
+    const next = Math.min(range.max, Math.max(range.min, current + delta));
+    updateBaseline({ [field]: next });
   };
 
   const rows: { key: Exclude<Open, null>; icon: React.ComponentProps<typeof Ionicons>['name']; title: string; subtitle: string; value: string }[] = [
-    { key: 'goal', icon: 'flag', title: 'My goal', subtitle: 'Tailors the guidance you see', value: goalLabel(settings.goal) },
-    { key: 'cycle', icon: 'sync', title: 'Typical cycle length', subtitle: 'Usually between 21 and 35 days', value: settings.cycleLength + ' days' },
-    { key: 'period', icon: 'water', title: 'Typical period length', subtitle: 'Usually between 2 and 7 days', value: settings.periodLength + ' days' },
+    { key: 'goal', icon: 'flag', title: 'My goal', subtitle: 'Tailors the guidance you see', value: goalLabel(goal) },
+    { key: 'cycle', icon: 'sync', title: 'Usual cycle length', subtitle: 'Usually between 21 and 35 days', value: daysLabel(baseline.cycleLength) },
+    { key: 'period', icon: 'water', title: 'Usual period length', subtitle: 'Usually between 2 and 7 days', value: daysLabel(baseline.periodLength) },
+    { key: 'regularity', icon: 'pulse', title: 'Cycle regularity', subtitle: 'How much your cycle length changes', value: regularityLabel(baseline.regularity) },
   ];
-  
+
+  const renderOption = (key: string, label: string, detail: string, selected: boolean, onPress: () => void) => (
+    <Pressable
+      key={key}
+      style={[styles.option, selected && styles.optionSelected]}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+    >
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.optionTitle, selected && styles.optionTitleSelected]}>{label}</Text>
+        <Text style={styles.optionDetail}>{detail}</Text>
+      </View>
+      {selected ? <Ionicons name="checkmark-circle" size={22} color={colors.magenta} /> : null}
+    </Pressable>
+  );
+
+  const stepper = (field: 'cycleLength' | 'periodLength', what: string) => (
+    <View style={styles.stepper}>
+      <Pressable style={styles.stepButton} onPress={() => step(field, -1)} accessibilityLabel={'Decrease ' + what}>
+        <Ionicons name="remove" size={24} color={colors.magenta} />
+      </Pressable>
+      <Text style={styles.stepValue}>{daysLabel(baseline[field])}</Text>
+      <Pressable style={styles.stepButton} onPress={() => step(field, 1)} accessibilityLabel={'Increase ' + what}>
+        <Ionicons name="add" size={24} color={colors.magenta} />
+      </Pressable>
+    </View>
+  );
+
   return (
     <View style={styles.root}>
       <SafeAreaView style={styles.safe} edges={['top']}>
@@ -72,58 +115,36 @@ export default function CycleSettingsScreen() {
           </View>
 
           <Text style={styles.footnote}>
-            Fertility information in VIVA Cycle is an estimate based on your cycle history. It is not contraception and
-            cannot confirm ovulation or pregnancy.
+            Changing these settings updates future estimates only. Periods you have already logged are never changed.
+            Fertility information in VIVA Cycle is an estimate. It is not contraception and cannot confirm ovulation or
+            pregnancy.
           </Text>
         </ScrollView>
       </SafeAreaView>
 
       <BottomSheet visible={open === 'goal'} title="My goal" onClose={() => setOpen(null)}>
-        {GOAL_OPTIONS.map((g) => {
-          const selected = settings.goal === g.key;
-          return (
-            <Pressable
-              key={String(g.key)}
-              style={[styles.option, selected && styles.optionSelected]}
-              onPress={() => updateSettings({ goal: g.key })}
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.optionTitle, selected && styles.optionTitleSelected]}>{g.label}</Text>
-                <Text style={styles.optionDetail}>{g.detail}</Text>
-              </View>
-              {selected ? <Ionicons name="checkmark-circle" size={22} color={colors.magenta} /> : null}
-            </Pressable>
-          );
-        })}
+        {GOAL_OPTIONS.map((g) => renderOption(g.key, g.label, g.detail, goal === g.key, () => setGoal(g.key)))}
       </BottomSheet>
 
-      <BottomSheet visible={open === 'cycle'} title="Typical cycle length" onClose={() => setOpen(null)}>
-        <View style={styles.stepper}>
-          <Pressable style={styles.stepButton} onPress={() => step('cycleLength', -1, 21, 35)} accessibilityLabel="Decrease cycle length">
-            <Ionicons name="remove" size={24} color={colors.magenta} />
-          </Pressable>
-          <Text style={styles.stepValue}>{settings.cycleLength} days</Text>
-          <Pressable style={styles.stepButton} onPress={() => step('cycleLength', 1, 21, 35)} accessibilityLabel="Increase cycle length">
-            <Ionicons name="add" size={24} color={colors.magenta} />
-          </Pressable>
-        </View>
+      <BottomSheet visible={open === 'cycle'} title="Usual cycle length" onClose={() => setOpen(null)}>
+        {stepper('cycleLength', 'cycle length')}
+        {renderOption('not_sure', 'I’m not sure', 'Estimates assume 28 days until you log your next period.',
+          baseline.cycleLength === null, () => updateBaseline({ cycleLength: null }))}
         <Text style={styles.optionDetail}>
-          Once you have logged several periods, estimates use your own history instead.
+          Once you have logged a few periods, estimates use your own history instead.
         </Text>
       </BottomSheet>
 
-      <BottomSheet visible={open === 'period'} title="Typical period length" onClose={() => setOpen(null)}>
-        <View style={styles.stepper}>
-          <Pressable style={styles.stepButton} onPress={() => step('periodLength', -1, 2, 7)} accessibilityLabel="Decrease period length">
-            <Ionicons name="remove" size={24} color={colors.magenta} />
-          </Pressable>
-          <Text style={styles.stepValue}>{settings.periodLength} days</Text>
-          <Pressable style={styles.stepButton} onPress={() => step('periodLength', 1, 2, 7)} accessibilityLabel="Increase period length">
-            <Ionicons name="add" size={24} color={colors.magenta} />
-          </Pressable>
-        </View>
+      <BottomSheet visible={open === 'period'} title="Usual period length" onClose={() => setOpen(null)}>
+        {stepper('periodLength', 'period length')}
+        {renderOption('not_sure', 'I’m not sure', 'Estimates assume 5 days until you record more periods.',
+          baseline.periodLength === null, () => updateBaseline({ periodLength: null }))}
+      </BottomSheet>
+
+      <BottomSheet visible={open === 'regularity'} title="Cycle regularity" onClose={() => setOpen(null)}>
+        {REGULARITY_OPTIONS.map((r) =>
+          renderOption(r.key, r.label, r.detail, baseline.regularity === r.key, () => updateBaseline({ regularity: r.key }))
+        )}
       </BottomSheet>
     </View>
   );

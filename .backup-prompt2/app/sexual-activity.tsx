@@ -9,7 +9,6 @@ import SymptomCard from '../components/SymptomCard';
 import VivaToggle from '../components/VivaToggle';
 import YesNoSelector from '../components/YesNoSelector';
 import { colors, radius, spacing } from '../constants/theme';
-import { getToday } from '../constants/dateUtils';
 import { saveSexualActivity } from '../constants/cycleStore';
 
 type ActivityType = 'vaginal' | 'oral' | 'anal' | 'manual' | 'other';
@@ -44,7 +43,7 @@ export default function SexualActivityScreen() {
   };
 
   const handleSave = () => {
-    const date = getToday();
+    const date = new Date().toISOString().slice(0, 10);
     saveSexualActivity(date, hadActivity);
     router.back();
   };

@@ -1,7 +1,4 @@
-import { addDays, dayDiff } from './dateUtils';
-import { completedCycleLengths, latestStartOnOrBefore, PeriodEntry } from './periodHistory';
-
-export { addDays, dayDiff };
+import { PeriodEntry } from './cycleStore';
 
 export type Confidence = 'none' | 'low' | 'moderate' | 'good';
 
@@ -26,23 +23,17 @@ export type CycleStats = {
   confidence: Confidence;
 };
 
-export type DateRange = { start: string; end: string };
-
 export type CycleEstimate = {
   stats: CycleStats;
   basis: 'history' | 'assumed';
-  // Where expectedCycleLength came from: the user's own logged cycles,
-  // the usual length they entered, or the 28-day default.
-  lengthSource: 'history' | 'usual' | 'default';
-  cycleStart: string | null; // latest CONFIRMED period start on or before today
+  cycleStart: string | null;
   cycleDay: number | null;
   expectedCycleLength: number;
-  nextPeriod: string | null; // PREDICTED
-  predictedPeriod: DateRange | null; // PREDICTED
+  nextPeriod: string | null;
   daysToNextPeriod: number | null;
   periodLateDays: number;
-  ovulation: string | null; // ESTIMATED, never confirmed
-  fertileWindow: DateRange | null; // ESTIMATED
+  ovulation: string | null;
+  fertileWindow: { start: string; end: string } | null;
   uncertaintyDays: number;
   status: FertilityStatus;
 };
@@ -52,39 +43,35 @@ export const LUTEAL_PHASE_DAYS = 14;
 export const FERTILE_DAYS_BEFORE_OVULATION = 5;
 export const MIN_CYCLES_FOR_HISTORY = 3;
 
-// ---- Small, separate calculations (swap any of these to improve the model) ----
-
-// The first day of the latest confirmed period is cycle day 1.
-export function calculateCycleDay(cycleStart: string, todayKey: string): number {
-  return dayDiff(cycleStart, todayKey) + 1;
+function toDate(key: string) {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d);
 }
 
-export function calculateNextPeriod(cycleStart: string, cycleLength: number): string {
-  return addDays(cycleStart, cycleLength);
+function toKey(d: Date) {
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return d.getFullYear() + '-' + mm + '-' + dd;
 }
 
-export function calculatePredictedPeriod(nextPeriod: string, periodLength: number): DateRange {
-  return { start: nextPeriod, end: addDays(nextPeriod, periodLength - 1) };
+export function addDays(key: string, days: number): string {
+  const d = toDate(key);
+  d.setDate(d.getDate() + days);
+  return toKey(d);
 }
 
-// Simple calendar model: ovulation = next period start - 14 days. An estimate only.
-export function calculateEstimatedOvulation(nextPeriod: string): string {
-  return addDays(nextPeriod, -LUTEAL_PHASE_DAYS);
+export function dayDiff(a: string, b: string): number {
+  return Math.round((toDate(b).getTime() - toDate(a).getTime()) / 86400000);
 }
 
-// 5 days before estimated ovulation through the ovulation day.
-export function calculateFertileWindow(ovulation: string): DateRange {
-  return { start: addDays(ovulation, -FERTILE_DAYS_BEFORE_OVULATION), end: ovulation };
-}
-
-// ---- Statistics ----
-
-// Uses the last 6 completed cycles. Gaps under 15 or over 60 days usually mean
-// a missed log rather than a real cycle, so they are left out of the statistics
-// (they are still returned by completedCycleLengths).
 export function computeCycleStats(periods: PeriodEntry[]): CycleStats {
-  const usable = completedCycleLengths(periods).filter((g) => g >= 15 && g <= 60);
-  const cycleLengths = usable.slice(-6);
+  const starts = periods.map((p) => p.date).sort();
+  const all: number[] = [];
+  for (let i = 1; i < starts.length; i++) {
+    const gap = dayDiff(starts[i - 1], starts[i]);
+    if (gap >= 15 && gap <= 60) all.push(gap);
+  }
+  const cycleLengths = all.slice(-6);
   const count = cycleLengths.length;
 
   if (count === 0) {
@@ -105,27 +92,22 @@ export function computeCycleStats(periods: PeriodEntry[]): CycleStats {
   return { cycleLengths, count, average, min, max, spread, confidence };
 }
 
-// ---- The estimate ----
-
-// periods: CONFIRMED history only. typicalCycleLength: the user's usual length,
-// or null when they don't know it. Nothing here is ever written back to history.
 export function estimateCycle(
   periods: PeriodEntry[],
   periodLength: number,
   todayKey: string,
-  typicalCycleLength: number | null = null
+  typicalCycleLength: number = DEFAULT_CYCLE_LENGTH
 ): CycleEstimate {
   const stats = computeCycleStats(periods);
+  const starts = periods.map((p) => p.date).sort();
 
   const empty: CycleEstimate = {
     stats,
     basis: 'assumed',
-    lengthSource: typicalCycleLength !== null ? 'usual' : 'default',
     cycleStart: null,
     cycleDay: null,
-    expectedCycleLength: typicalCycleLength ?? DEFAULT_CYCLE_LENGTH,
+    expectedCycleLength: DEFAULT_CYCLE_LENGTH,
     nextPeriod: null,
-    predictedPeriod: null,
     daysToNextPeriod: null,
     periodLateDays: 0,
     ovulation: null,
@@ -133,26 +115,23 @@ export function estimateCycle(
     uncertaintyDays: 4,
     status: 'unknown',
   };
+  if (starts.length === 0) return empty;
 
-  const cycleStart = latestStartOnOrBefore(periods, todayKey);
-  if (cycleStart === null) return empty;
+  const onOrBefore = starts.filter((s) => s <= todayKey);
+  const cycleStart = onOrBefore.length ? onOrBefore[onOrBefore.length - 1] : starts[starts.length - 1];
 
   const useHistory = stats.average !== null && stats.count >= MIN_CYCLES_FOR_HISTORY;
-  const lengthSource: CycleEstimate['lengthSource'] = useHistory
-    ? 'history'
-    : typicalCycleLength !== null
-    ? 'usual'
-    : 'default';
-  const expectedCycleLength = useHistory
-    ? Math.round(stats.average as number)
-    : typicalCycleLength ?? DEFAULT_CYCLE_LENGTH;
+  const basis: 'history' | 'assumed' = useHistory ? 'history' : 'assumed';
+  const expectedCycleLength = useHistory ? Math.round(stats.average as number) : typicalCycleLength;
 
-  const nextPeriod = calculateNextPeriod(cycleStart, expectedCycleLength);
-  const predictedPeriod = calculatePredictedPeriod(nextPeriod, periodLength);
-  const ovulation = calculateEstimatedOvulation(nextPeriod);
-  const fertileWindow = calculateFertileWindow(ovulation);
+  const nextPeriod = addDays(cycleStart, expectedCycleLength);
+  const ovulation = addDays(nextPeriod, -LUTEAL_PHASE_DAYS);
+  const fertileWindow = {
+    start: addDays(ovulation, -FERTILE_DAYS_BEFORE_OVULATION),
+    end: ovulation,
+  };
 
-  const cycleDay = calculateCycleDay(cycleStart, todayKey);
+  const cycleDay = dayDiff(cycleStart, todayKey) + 1;
   const daysToNextPeriod = dayDiff(todayKey, nextPeriod);
   const periodLateDays = daysToNextPeriod < 0 ? -daysToNextPeriod : 0;
 
@@ -173,13 +152,11 @@ export function estimateCycle(
 
   return {
     stats,
-    basis: useHistory ? 'history' : 'assumed',
-    lengthSource,
+    basis,
     cycleStart,
     cycleDay,
     expectedCycleLength,
     nextPeriod,
-    predictedPeriod,
     daysToNextPeriod,
     periodLateDays,
     ovulation,

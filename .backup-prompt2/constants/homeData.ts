@@ -1,6 +1,5 @@
-import { formatLongDate } from './cycleData';
-import { calculateCycle, FertilityStatus, Goal, todayLocal } from '../lib/cycleEngine';
-import { VivaState } from '../lib/vivaStore';
+import { cycleState, formatLongDate } from './cycleData';
+import { estimateCycle, FertilityStatus } from './cycleEngine';
 
 type LateCopy = { label: string; explanation: string; message: string };
 
@@ -26,9 +25,11 @@ function lateCopy(daysLate: number): LateCopy {
     message: 'If you could be pregnant, a pregnancy test can help.',
   };
 }
+import { CycleLog, getCycleLog } from './cycleStore';
+import { Goal, getSettings } from './settingsStore';
 
 // Extra guidance by goal. Estimates only: never "safe day", never a guarantee either way.
-function goalGuidance(goal: Goal | null, status: FertilityStatus): string | null {
+function goalGuidance(goal: Goal, status: FertilityStatus): string | null {
   const fertileNow = status === 'potentiallyFertile' || status === 'ovulationLikely';
   const approaching = status === 'fertileApproaching';
 
@@ -70,7 +71,7 @@ export function firstName(fullName: string): string {
 type StatusCopy = { label: string; explanation: string; message: string; note: string | null };
 
 // Wording follows the product rules: estimates, never certainty, never a "safe day".
-const STATUS_COPY: Record<FertilityStatus | 'unknown', StatusCopy> = {
+const STATUS_COPY: Record<FertilityStatus, StatusCopy> = {
   menstruation: {
     label: 'Menstruation',
     explanation: 'Your period is under way. Rest and be gentle with yourself.',
@@ -127,68 +128,49 @@ const STATUS_COPY: Record<FertilityStatus | 'unknown', StatusCopy> = {
   },
 };
 
-export function getHomeSummary(viva: VivaState, today: string = todayLocal()) {
-  const est = calculateCycle(viva.baseline, viva.periods, today);
+function getEstimate(log: CycleLog) {
+  const s = getSettings();
+  return estimateCycle(log.periods, s.periodLength, cycleState.today, s.cycleLength);
+}
 
-  if (!est) {
-    const copy = STATUS_COPY.unknown;
-    return {
-      hasData: false,
-      cycleDay: 0,
-      cycleLength: 28,
-      progress: 0,
-      phase: copy.label,
-      statusKey: 'unknown' as const,
-      fertileRange: 'Not enough data yet',
-      ovulationText: 'Not enough data yet',
-      nextPeriodDays: 0,
-      nextPeriodText: 'Not enough data yet',
-      periodLateDays: 0,
-      isLate: false,
-      goal: viva.goal,
-      goalNote: null,
-      phaseExplanation: copy.explanation,
-      todayMessage: copy.message,
-      todayNote: copy.note,
-      confidenceNote: '',
-    };
-  }
+export function getHomeSummary() {
+  const log = getCycleLog();
+  const est = getEstimate(log);
+  const isLate = est.periodLateDays >= 2;
+  const copy = isLate ? { ...STATUS_COPY[est.status], ...lateCopy(est.periodLateDays), note: null } : STATUS_COPY[est.status];
 
-  const copy = est.isLate
-    ? { ...STATUS_COPY[est.status], ...lateCopy(est.daysLate), note: null }
-    : STATUS_COPY[est.status];
+  const hasData = est.cycleStart !== null;
+  const cycleLength = est.expectedCycleLength;
+  const cycleDay = est.cycleDay ?? 0;
 
   let confidenceNote: string;
-  if (est.lengthSource === 'default') {
-    confidenceNote =
-      'You chose "Not sure" for cycle length, so these dates assume a 28-day cycle until you log your next period.';
-  } else if (est.lengthSource === 'baseline') {
-    confidenceNote =
-      'These dates use your usual cycle length of ' + est.cycleLengthUsed + ' days until you log more periods.';
-  } else if (est.confidence === 'high') {
+  if (est.stats.confidence === 'good') {
     confidenceNote = 'Your cycle timing has been fairly consistent, so this estimate is based on your recent pattern.';
-  } else if (est.confidence === 'medium') {
+  } else if (est.stats.confidence === 'moderate') {
     confidenceNote = 'Your cycle timing has been somewhat consistent, so these estimates are approximate.';
-  } else {
+  } else if (est.stats.confidence === 'low') {
     confidenceNote = 'Your cycle lengths vary, so predicting ovulation from calendar dates alone is less reliable.';
+  } else {
+    confidenceNote = 'These dates use your typical cycle length of ' + getSettings().cycleLength + ' days until you log more periods.';
   }
 
   return {
-    hasData: true,
-    cycleDay: est.currentCycleDay,
-    cycleLength: est.cycleLengthUsed,
-    progress: Math.min(est.currentCycleDay / est.cycleLengthUsed, 1),
+    hasData,
+    cycleDay,
+    cycleLength,
+    progress: Math.min(cycleDay / cycleLength, 1),
     phase: copy.label,
     statusKey: est.status,
-    fertileRange:
-      shortDate(est.estimatedFertileWindow.start) + ' – ' + formatLongDate(est.estimatedFertileWindow.end),
-    ovulationText: formatLongDate(est.estimatedOvulation),
-    nextPeriodDays: Math.max(0, est.daysToNextPeriod),
-    nextPeriodText: 'Expected ' + formatLongDate(est.estimatedNextPeriod),
-    periodLateDays: est.daysLate,
-    isLate: est.isLate,
-    goal: viva.goal,
-    goalNote: goalGuidance(viva.goal, est.status),
+    fertileRange: est.fertileWindow
+      ? shortDate(est.fertileWindow.start) + ' – ' + formatLongDate(est.fertileWindow.end)
+      : 'Not enough data yet',
+    ovulationText: est.ovulation ? formatLongDate(est.ovulation) : 'Not enough data yet',
+    nextPeriodDays: est.daysToNextPeriod ?? 0,
+    nextPeriodText: est.nextPeriod ? 'Expected ' + formatLongDate(est.nextPeriod) : 'Not enough data yet',
+    periodLateDays: est.periodLateDays,
+    isLate,
+    goal: getSettings().goal,
+    goalNote: goalGuidance(getSettings().goal, est.status),
     phaseExplanation: copy.explanation,
     todayMessage: copy.message,
     todayNote: copy.note,

@@ -1,10 +1,8 @@
 import { useSyncExternalStore } from 'react';
-import { cycleState as initialCycleState } from './cycleData';
+import { cycleState as demo } from './cycleData';
+import { AddOutcome, addPeriod, PeriodEntry } from './periodHistory';
 
-export type PeriodEntry = {
-  date: string; // YYYY-MM-DD, first day of period
-  flowIntensity?: 'light' | 'medium' | 'heavy' | 'spotting';
-};
+export type { PeriodEntry } from './periodHistory';
 
 export type DailyLog = {
   date: string;
@@ -18,24 +16,22 @@ export type SexualActivityEntry = {
   hadActivity: boolean;
 };
 
+// Only things the user actually recorded live here. Predicted periods,
+// estimated ovulation and the fertile window are calculated, never stored.
 export type CycleLog = {
-  periods: PeriodEntry[]; // sorted ascending by date
-  dailyLogs: Record<string, DailyLog>; // keyed by date
+  periods: PeriodEntry[]; // CONFIRMED periods, sorted ascending
+  dailyLogs: Record<string, DailyLog>;
   sexualActivity: SexualActivityEntry[];
-  cycleLength: number;
-  periodLength: number;
 };
 
-// Seeded from the existing demo data so Calendar/Home/Insights don't go blank.
+// DEMO DATA ONLY: stands in for onboarding until it exists. Stored as confirmed
+// history so the app has something to show. Remove when real onboarding lands.
+const DEMO_PERIOD_STARTS = ['2026-08-09', demo.periodDays[0]];
+
 let state: CycleLog = {
-  periods: [
-    { date: '2026-08-09' },
-    { date: initialCycleState.periodDays[0] },
-  ],
+  periods: DEMO_PERIOD_STARTS.map((date) => ({ date, source: 'confirmed' as const })),
   dailyLogs: {},
-  sexualActivity: initialCycleState.sexEvents.map((date) => ({ date, hadActivity: true })),
-  cycleLength: initialCycleState.cycleLength,
-  periodLength: initialCycleState.periodLength,
+  sexualActivity: demo.sexEvents.map((date) => ({ date, hadActivity: true })),
 };
 
 const listeners = new Set<() => void>();
@@ -59,16 +55,17 @@ export function useCycleLog(): CycleLog {
   return useSyncExternalStore(subscribe, getCycleLog);
 }
 
-export function logPeriodStart(date: string, flowIntensity?: PeriodEntry['flowIntensity']) {
-  const existing = state.periods.find((p) => p.date === date);
-  let periods: PeriodEntry[];
-  if (existing) {
-    periods = state.periods.map((p) => (p.date === date ? { ...p, flowIntensity } : p));
-  } else {
-    periods = [...state.periods, { date, flowIntensity }].sort((a, b) => a.date.localeCompare(b.date));
-  }
-  state = { ...state, periods };
+// Saves a confirmed period start. Never creates a duplicate record: logging the
+// same day again updates it, and a start within 15 days of another is merged into it.
+export function logPeriodStart(
+  date: string,
+  flowIntensity?: PeriodEntry['flowIntensity'],
+  durationDays?: number
+): AddOutcome {
+  const result = addPeriod(state.periods, date, { flowIntensity, durationDays });
+  state = { ...state, periods: result.periods };
   notify();
+  return result.outcome;
 }
 
 export function saveDailyLog(date: string, patch: Partial<DailyLog>) {

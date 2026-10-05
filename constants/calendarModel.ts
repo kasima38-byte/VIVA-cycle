@@ -1,65 +1,57 @@
+// VIVA Cycle — calendar month model
+// Draws ONLY what lib/cycleEngine.ts calculates. No cycle maths happens here
+// beyond laying dates onto the month grid.
+
 import { DayInfo } from './cycleData';
-import { addDays, estimateCycle, FERTILE_DAYS_BEFORE_OVULATION, LUTEAL_PHASE_DAYS } from './cycleEngine';
-import { CycleLog } from './cycleStore';
-import { Settings } from './settingsStore';
+import { addDays, CycleEstimate, diffDays, PeriodLog, predictCycles } from '../lib/cycleEngine';
 
 export type DayModel = DayInfo & {
   isPredictedPeriod: boolean;
 };
 
-function pad(n: number) {
-  return String(n).padStart(2, '0');
-}
+const pad = (n: number) => String(n).padStart(2, '0');
+const toKey = (y: number, m: number, d: number) => y + '-' + pad(m + 1) + '-' + pad(d);
 
-function toKey(y: number, m: number, d: number) {
-  return y + '-' + pad(m + 1) + '-' + pad(d);
+function addRange(set: Set<string>, start: string, end: string) {
+  for (let d = start; diffDays(end, d) >= 0; d = addDays(d, 1)) set.add(d);
 }
 
 export function buildCalendarMonth(
   year: number,
   monthIndex: number,
-  log: CycleLog,
-  settings: Settings,
+  periods: PeriodLog[],
+  est: CycleEstimate | null,
+  sexDates: string[],
   todayKey: string
 ): DayModel[] {
-  const est = estimateCycle(log.periods, settings.periodLength, todayKey, settings.cycleLength);
-  const len = est.expectedCycleLength;
-  const plen = settings.periodLength;
-  const late = est.periodLateDays >= 2;
-
   const periodDays = new Set<string>();
   const predictedDays = new Set<string>();
   const fertileDays = new Set<string>();
   const ovulationDays = new Set<string>();
 
-  const markFertile = (ovulation: string) => {
-    ovulationDays.add(ovulation);
-    for (let d = 0; d <= FERTILE_DAYS_BEFORE_OVULATION; d++) {
-      fertileDays.add(addDays(ovulation, -d));
-    }
-  };
-
-  // Logged periods are facts. Ovulation in past cycles is looked back from the next logged period.
-  const starts = log.periods.map((p) => p.date).sort();
-  starts.forEach((s, i) => {
-    for (let d = 0; d < plen; d++) periodDays.add(addDays(s, d));
+  // 1. Confirmed periods (facts). Until period-end logging exists, a period
+  //    without an end date is drawn with the period length in use.
+  const starts = Array.from(new Set(periods.map((p) => p.start))).sort();
+  const plen = est ? est.periodLengthUsed : 5;
+  starts.forEach((start, i) => {
+    const log = periods.find((p) => p.start === start);
+    let end = log?.end ?? addDays(start, plen - 1);
     const next = starts[i + 1];
-    if (next) markFertile(addDays(next, -LUTEAL_PHASE_DAYS));
+    if (next && diffDays(next, end) <= 0) end = addDays(next, -1); // never overlap the next period
+    addRange(periodDays, start, end);
   });
 
-  // Predictions run forward from the latest period. Nothing is projected while a period is late.
-  if (est.cycleStart) {
-    const last = late ? 0 : 3;
-    for (let k = 0; k <= last; k++) {
-      const nextStart = addDays(est.cycleStart, (k + 1) * len);
-      markFertile(addDays(nextStart, -LUTEAL_PHASE_DAYS));
-      if (!late && nextStart >= todayKey) {
-        for (let d = 0; d < plen; d++) predictedDays.add(addDays(nextStart, d));
-      }
-    }
+  // 2. Predictions (estimates). While a period is late, only the overdue
+  //    prediction is shown — nothing further is projected.
+  if (est) {
+    predictCycles(est, est.isLate ? 1 : 4).forEach((c) => {
+      addRange(predictedDays, c.periodStart, c.periodEnd);
+      addRange(fertileDays, c.fertileStart, c.fertileEnd);
+      ovulationDays.add(c.ovulation);
+    });
   }
 
-  const sex = new Set(log.sexualActivity.filter((e) => e.hadActivity).map((e) => e.date));
+  const sex = new Set(sexDates);
 
   const make = (dateKey: string, day: number, inMonth: boolean): DayModel => ({
     dateKey,
