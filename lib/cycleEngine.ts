@@ -56,8 +56,7 @@ export interface CycleEstimate {
 const DEFAULT_CYCLE = 28;
 const DEFAULT_PERIOD = 5;
 const LUTEAL_DAYS = 14;          // ovulation ≈ next period − 14
-const FERTILE_BEFORE = 5;        // sperm survival
-const FERTILE_AFTER = 1;         // egg survival
+const FERTILE_BEFORE = 5;        // sperm survival: window = ovulation − 5 … ovulation (6 days)
 const MAX_HISTORY_CYCLES = 6;
 const VALID_CYCLE = { min: 15, max: 90 };   // outside this = likely a missed/duplicate log
 const VALID_PERIOD = { min: 1, max: 14 };
@@ -200,13 +199,12 @@ export function calculateCycle(
   };
 
   const estimatedOvulation = addDays(estimatedNextPeriod, -LUTEAL_DAYS);
-  // Fertile window spans every possible ovulation day inside the period window,
-  // so irregular cycles automatically get a wider, more cautious window.
-  let fertileStart = addDays(estimatedPeriodWindow.start, -LUTEAL_DAYS - FERTILE_BEFORE);
-  const fertileEnd = addDays(estimatedPeriodWindow.end, -LUTEAL_DAYS + FERTILE_AFTER);
-  // Don't let the fertile window start before the current period has ended
-  const periodEnd = addDays(currentCycleStart, periodLengthUsed - 1);
-  if (diffDays(fertileStart, periodEnd) <= 0) fertileStart = addDays(periodEnd, 1);
+  // VIVA rule: estimated fertile window = 5 days before estimated ovulation
+  // through estimated ovulation day (6 days). Not clipped to the period:
+  // in short cycles the window may overlap bleeding days, and hiding that
+  // would understate fertility.
+  const fertileStart = addDays(estimatedOvulation, -FERTILE_BEFORE);
+  const fertileEnd = estimatedOvulation;
 
   // Late period: estimate has passed, no new confirmed log.
   // The cycle is NOT rolled forward — the day count simply keeps going.

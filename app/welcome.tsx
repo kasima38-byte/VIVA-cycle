@@ -15,7 +15,7 @@ import {
   validateSetup, createInitialLogs, calculateCycle,
 } from '../lib/cycleEngine';
 import { router } from 'expo-router';
-import { markSetupDone } from '../lib/setupState';
+import { completeSetup } from '../lib/vivaStore';
 
 // ---------- Colours sampled from the reference image ----------
 const C = {
@@ -142,10 +142,12 @@ export default function WelcomeSetupScreen({
       return;
     }
 
+    // Save her answers first: LMP becomes her first confirmed period.
+    completeSetup(data);
+
     // Show the engine's estimates, then go to Home.
     const est = calculateCycle(baseline, createInitialLogs(lmp));
     const goHome = () => {
-      markSetupDone();
       router.replace('/');
     };
     if (est) {

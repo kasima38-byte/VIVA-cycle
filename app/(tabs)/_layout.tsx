@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Redirect, router, Tabs } from 'expo-router';
 import { Pressable, View } from 'react-native';
-import { isSetupDone } from '../../lib/setupState';
+import { useVivaStore } from '../../lib/vivaStore';
 
 const NAVY = '#0B1F4F';
 const NAVY_SOFT = '#38598F';
@@ -10,7 +10,8 @@ const BORDER = '#EFEBF2';
 
 export default function TabsLayout() {
   // Show the welcome screen until setup is completed
-  if (!isSetupDone()) return <Redirect href="/welcome" />;
+  const { setupComplete } = useVivaStore();
+  if (!setupComplete) return <Redirect href="/welcome" />;
 
   return (
     <Tabs
