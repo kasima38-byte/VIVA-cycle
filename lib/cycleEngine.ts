@@ -79,7 +79,9 @@ export interface CycleEstimate {
 
 const DEFAULT_CYCLE = 28;
 const DEFAULT_PERIOD = 5;
-export const LUTEAL_DAYS = 14;          // ovulation ≈ next period − 14
+export const LUTEAL_DAYS = 14;          // days AFTER ovulation, up to the day before the next period
+/** Estimated ovulation = next period − 15 days, i.e. cycle day (cycle length − 14): CD14 in a 28-day cycle. */
+export const OVULATION_BEFORE_NEXT_PERIOD = LUTEAL_DAYS + 1;
 export const FERTILE_BEFORE = 5;        // sperm survival: window = ovulation − 5 … ovulation (6 days)
 const MAX_HISTORY_CYCLES = 6;
 const VALID_CYCLE = { min: 15, max: 90 };   // outside this = likely a missed/duplicate log
@@ -231,7 +233,7 @@ export function calculateCycle(
     end: addDays(estimatedNextPeriod, margin),
   };
 
-  const estimatedOvulation = addDays(estimatedNextPeriod, -LUTEAL_DAYS);
+  const estimatedOvulation = addDays(estimatedNextPeriod, -OVULATION_BEFORE_NEXT_PERIOD);
   // VIVA rule: estimated fertile window = 5 days before estimated ovulation
   // through estimated ovulation day (6 days). Not clipped to the period:
   // in short cycles the window may overlap bleeding days, and hiding that
@@ -294,7 +296,7 @@ export function predictCycles(est: CycleEstimate, count: number): PredictedCycle
   const out: PredictedCycle[] = [];
   for (let k = 1; k <= count; k++) {
     const periodStart = addDays(est.currentCycleStart, k * est.cycleLengthUsed);
-    const ovulation = addDays(periodStart, -LUTEAL_DAYS);
+    const ovulation = addDays(periodStart, -OVULATION_BEFORE_NEXT_PERIOD);
     out.push({
       periodStart,
       periodEnd: addDays(periodStart, est.periodLengthUsed - 1),

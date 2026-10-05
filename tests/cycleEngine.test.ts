@@ -49,8 +49,8 @@ group('A  Sarah: LMP 5 Sep, 28 days, 5-day period, regular (Prompt 3 example)');
   eq(e.currentCycleDay, 22, '26 Sep is cycle day 22 (5 Sep = day 1)');
   eq(e.estimatedNextPeriod, '2026-10-03', 'next period 3 Oct');
   eq(e.estimatedPeriodWindow, { start: '2026-10-03', end: '2026-10-07' }, 'period window 3–7 Oct');
-  eq(e.estimatedOvulation, '2026-09-19', 'estimated ovulation 19 Sep');
-  eq(e.estimatedFertileWindow, { start: '2026-09-14', end: '2026-09-19' }, 'fertile window 14–19 Sep (6 days)');
+  eq(e.estimatedOvulation, '2026-09-18', 'estimated ovulation 18 Sep (CD14)');
+  eq(e.estimatedFertileWindow, { start: '2026-09-13', end: '2026-09-18' }, 'fertile window 13–18 Sep (6 days)');
   eq(e.lengthSource, 'baseline', 'uses her stated 28 days');
 }
 
@@ -128,8 +128,8 @@ group('Calendar matches the engine');
   const e = est(B(28, 5), l, '2026-09-26');
   eq(marked(2026, 8, l, e, '2026-09-26', 'isPeriod'), [5], 'September: only the logged day is confirmed');
   eq(marked(2026, 8, l, e, '2026-09-26', 'isPredictedPeriod'), [6, 7, 8, 9], 'September: 6–9 estimated from usual length');
-  eq(marked(2026, 8, l, e, '2026-09-26', 'isFertile'), [14, 15, 16, 17, 18, 19], 'September: fertile 14–19');
-  eq(marked(2026, 8, l, e, '2026-09-26', 'isOvulation'), [19], 'September: ovulation 19');
+  eq(marked(2026, 8, l, e, '2026-09-26', 'isFertile'), [13, 14, 15, 16, 17, 18], 'September: fertile 13–18');
+  eq(marked(2026, 8, l, e, '2026-09-26', 'isOvulation'), [18], 'September: ovulation 18');
   eq(marked(2026, 9, l, e, '2026-09-26', 'isPredictedPeriod'), [3, 4, 5, 6, 7, 31], 'October: predicted 3–7 and 31');
 }
 
@@ -138,7 +138,7 @@ group('Home matches the engine');
   const h = getHomeSummary(viva(B(28, 5), logs('2026-09-05')), '2026-09-26');
   eq(h.cycleDay, 22, 'cycle day 22');
   eq(h.nextPeriodText, 'Expected 3 Oct 2026', 'next period text');
-  eq(h.fertileRange, '14 Sep – 19 Sep 2026', 'fertile range text');
+  eq(h.fertileRange, '13 Sep – 18 Sep 2026', 'fertile range text');
   eq(h.confidenceNote.includes('null'), false, 'no "null" in the wording');
 }
 
@@ -233,11 +233,11 @@ group('Prompt 5 · Current cycle: logged 3 Oct, 28 days, 5-day period');
   eq(cd(31), 29, 'Oct 31 is CD29 until a period is actually logged');
   eq(marked(2026, 9, l, e, '2026-10-17', 'isPeriod'), [3], 'only 3 Oct is confirmed');
   eq(marked(2026, 9, l, e, '2026-10-17', 'isPredictedPeriod'), [4, 5, 6, 7, 31], '4–7 Oct estimated, 31 Oct predicted');
-  eq(marked(2026, 9, l, e, '2026-10-17', 'isFertile'), [12, 13, 14, 15, 16, 17], 'fertile 12–17 Oct (no 18th)');
-  eq(marked(2026, 9, l, e, '2026-10-17', 'isOvulation'), [17], 'estimated ovulation 17 Oct');
+  eq(marked(2026, 9, l, e, '2026-10-17', 'isFertile'), [11, 12, 13, 14, 15, 16], 'fertile 11–16 Oct (6 days, nothing after ovulation)');
+  eq(marked(2026, 9, l, e, '2026-10-17', 'isOvulation'), [16], 'estimated ovulation 16 Oct (CD14)');
   eq(marked(2026, 9, l, e, '2026-10-17', 'isToday'), [17], 'today marked from the local date given');
   const h = getHomeSummary(viva(B(28, 5), l), '2026-10-17');
-  eq([h.cycleDay, h.nextPeriodText, h.ovulationText], [cd(17), 'Expected 31 Oct 2026', '17 Oct 2026'], 'Home agrees with Calendar');
+  eq([h.cycleDay, h.nextPeriodText, h.ovulationText], [cd(17), 'Expected 31 Oct 2026', '16 Oct 2026'], 'Home agrees with Calendar');
 }
 
 group('Prompt 5 · Logged end date is shown as confirmed (29 Dec – 2 Jan)');
@@ -293,6 +293,16 @@ group('Prompt 5 · Late, early and missed periods on the Calendar');
   eq(marked(2026, 9, missed, eM, '2026-11-02', 'isPredictedPeriod').includes(31), true, '31 Oct stays a prediction');
   eq(eM.currentCycleStart, '2026-10-03', 'cycle stays anchored to 3 Oct');
   eq(cycleDayOn(missed, '2026-11-02', '2026-11-02'), 31, '2 Nov = CD31 (no automatic reset)');
+}
+
+group('Ovulation = cycle day (cycle length − 14)');
+{
+  for (const [len, day] of [[21, 7], [28, 14], [30, 16], [35, 21]] as const) {
+    const l = logs('2026-10-03');
+    const e = est(B(len, 5), l, '2026-10-03');
+    eq(cycleDayOn(l, e.estimatedOvulation, '2026-10-03'), day, len + '-day cycle → estimated ovulation on CD' + day);
+    eq(diffDays(e.estimatedNextPeriod, e.estimatedOvulation) - 1, 14, len + '-day cycle → 14-day luteal phase');
+  }
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
