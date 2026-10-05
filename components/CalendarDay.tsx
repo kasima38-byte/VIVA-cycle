@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { DayInfo } from '../constants/cycleData';
 import { colors } from '../constants/theme';
 
-type DayProps = DayInfo & { isPredictedPeriod?: boolean };
+type DayProps = DayInfo & { isPredictedPeriod?: boolean; cycleDay?: number | null };
 
 type Props = {
   day: DayProps;
@@ -17,7 +17,8 @@ const CIRCLE = 40;
 function describe(day: DayProps) {
   const parts: string[] = [String(day.day)];
   if (day.isToday) parts.push('today');
-  if (day.isPeriod) parts.push('period');
+  if (day.cycleDay) parts.push('cycle day ' + day.cycleDay);
+  if (day.isPeriod) parts.push('logged period');
   if (day.isPredictedPeriod) parts.push('predicted period');
   if (day.isOvulation) parts.push('estimated ovulation');
   else if (day.isFertile) parts.push('estimated fertile window');
@@ -95,7 +96,7 @@ const styles = StyleSheet.create({
   },
   periodCircle: { backgroundColor: colors.magenta },
   ovulationCircle: { backgroundColor: colors.ovulationPurple },
-  predictedCircle: { backgroundColor: colors.pinkSoft },
+  predictedCircle: { backgroundColor: colors.pinkSoft, borderWidth: 1, borderColor: colors.magenta + '55' },
   todayCircle: {
     borderWidth: 1.5,
     borderColor: colors.magenta,

@@ -2,7 +2,7 @@
 // Run with:  npx tsx tests/cycleEngine.test.ts
 // Other time zones:  TZ=Africa/Kampala npx tsx tests/cycleEngine.test.ts
 import {
-  addDays, applyPeriodCorrection, applyPeriodLog, calculateCycle, completedCycles,
+  addDays, applyPeriodCorrection, applyPeriodLog, calculateCycle, completedCycles, cycleDayOn,
   CycleBaseline, diffDays, PeriodLog, Regularity,
 } from '../lib/cycleEngine';
 import { buildCalendarMonth } from '../constants/calendarModel';
@@ -37,7 +37,7 @@ const viva = (b: CycleBaseline, l: PeriodLog[]): VivaState => ({
   baseline: b, goal: 'conceive', periods: l,
 });
 const marked = (year: number, month: number, l: PeriodLog[], e: ReturnType<typeof est>, today: string,
-  key: 'isPeriod' | 'isPredictedPeriod' | 'isFertile' | 'isOvulation') =>
+  key: 'isPeriod' | 'isPredictedPeriod' | 'isFertile' | 'isOvulation' | 'isToday') =>
   buildCalendarMonth(year, month, l, e, [], today).filter((d) => d.isCurrentMonth && d[key]).map((d) => d.day);
 
 console.log('Time zone: ' + (process.env.TZ ?? 'system default'));
@@ -80,8 +80,9 @@ group('H–J  Month, year and February boundaries');
 {
   const l = logs('2026-12-30');
   const e = est(B(28, 5), l, '2027-01-02');
-  eq(marked(2026, 11, l, e, '2027-01-02', 'isPeriod'), [30, 31], 'December shows 30–31');
-  eq(marked(2027, 0, l, e, '2027-01-02', 'isPeriod'), [1, 2, 3], 'January shows 1–3 (same period)');
+  eq(marked(2026, 11, l, e, '2027-01-02', 'isPeriod'), [30], 'December: logged start 30 Dec');
+  eq(marked(2026, 11, l, e, '2027-01-02', 'isPredictedPeriod'), [31], 'December: 31 Dec estimated (no end logged)');
+  eq(marked(2027, 0, l, e, '2027-01-02', 'isPredictedPeriod').slice(0, 3), [1, 2, 3], 'January: 1–3 continue the same period');
   eq(e.currentCycleDay, 4, '2 Jan is day 4');
   eq(est(B(28, 5), logs('2028-02-10'), '2028-02-20').estimatedNextPeriod, '2028-03-09', 'leap-year February');
   eq(est(B(28, 5), logs('2027-02-10'), '2027-02-20').estimatedNextPeriod, '2027-03-10', 'normal February');
@@ -125,7 +126,8 @@ group('Calendar matches the engine');
 {
   const l = logs('2026-09-05');
   const e = est(B(28, 5), l, '2026-09-26');
-  eq(marked(2026, 8, l, e, '2026-09-26', 'isPeriod'), [5, 6, 7, 8, 9], 'September: confirmed 5–9');
+  eq(marked(2026, 8, l, e, '2026-09-26', 'isPeriod'), [5], 'September: only the logged day is confirmed');
+  eq(marked(2026, 8, l, e, '2026-09-26', 'isPredictedPeriod'), [6, 7, 8, 9], 'September: 6–9 estimated from usual length');
   eq(marked(2026, 8, l, e, '2026-09-26', 'isFertile'), [14, 15, 16, 17, 18, 19], 'September: fertile 14–19');
   eq(marked(2026, 8, l, e, '2026-09-26', 'isOvulation'), [19], 'September: ovulation 19');
   eq(marked(2026, 9, l, e, '2026-09-26', 'isPredictedPeriod'), [3, 4, 5, 6, 7, 31], 'October: predicted 3–7 and 31');
@@ -164,8 +166,8 @@ group('Prompt 4 · TEST B  Late period (8 Oct)');
   const e = est(B(28, 5), r.logs, '2026-10-08');
   eq(e.currentCycleDay, 1, '8 Oct = Cycle Day 1');
   eq(e.estimatedNextPeriod, '2026-11-05', 'next prediction from 8 Oct');
-  eq(marked(2026, 9, r.logs, e, '2026-10-08', 'isPredictedPeriod'), [], 'old 3–7 Oct prediction is gone');
-  eq(marked(2026, 9, r.logs, e, '2026-10-08', 'isPeriod'), [8, 9, 10, 11, 12], 'one confirmed period from 8 Oct');
+  eq(marked(2026, 9, r.logs, e, '2026-10-08', 'isPredictedPeriod').filter((d) => d < 8), [], 'old 3–7 Oct prediction is gone');
+  eq(marked(2026, 9, r.logs, e, '2026-10-08', 'isPeriod'), [8], 'one period, confirmed from 8 Oct');
 }
 
 group('Prompt 4 · TEST C  Early period (30 Sep)');
@@ -212,13 +214,85 @@ group('Prompt 4 · TEST F  History');
   const e = est(B(28, 5), h, '2026-11-10');
   eq([e.lengthSource, e.cycleLengthUsed], ['history', 30], 'two real cycles → predictions use her history (30)');
   eq(est(B(35, 5), h, '2026-11-10').cycleLengthUsed, 30, 'baseline setting does not overwrite observed history');
-  eq(marked(2026, 10, h, e, '2026-11-10', 'isPredictedPeriod'), [], 'no stale November prediction around the logged 4 Nov');
+  eq(marked(2026, 10, h, e, '2026-11-10', 'isPredictedPeriod').filter((d) => d < 4), [], 'no stale November prediction before the logged 4 Nov');
 }
 
 group('Prompt 4 · Year boundary');
 {
   const r = applyPeriodLog(logs('2026-12-10'), '2027-01-08', '2027-01-08');
   eq(r.result, { kind: 'added', completedCycle: 29 }, '10 Dec → 8 Jan = 29 days');
+}
+
+group('Prompt 5 · Current cycle: logged 3 Oct, 28 days, 5-day period');
+{
+  const l = logs('2026-10-03');
+  const e = est(B(28, 5), l, '2026-10-17');
+  const oct = buildCalendarMonth(2026, 9, l, e, [], '2026-10-17');
+  const cd = (d: number) => oct.find((c) => c.isCurrentMonth && c.day === d)!.cycleDay;
+  eq([cd(3), cd(4), cd(16), cd(17), cd(30)], [1, 2, 14, 15, 28], 'Oct 3 = CD1 … Oct 17 = CD15 … Oct 30 = CD28');
+  eq(cd(31), 29, 'Oct 31 is CD29 until a period is actually logged');
+  eq(marked(2026, 9, l, e, '2026-10-17', 'isPeriod'), [3], 'only 3 Oct is confirmed');
+  eq(marked(2026, 9, l, e, '2026-10-17', 'isPredictedPeriod'), [4, 5, 6, 7, 31], '4–7 Oct estimated, 31 Oct predicted');
+  eq(marked(2026, 9, l, e, '2026-10-17', 'isFertile'), [12, 13, 14, 15, 16, 17], 'fertile 12–17 Oct (no 18th)');
+  eq(marked(2026, 9, l, e, '2026-10-17', 'isOvulation'), [17], 'estimated ovulation 17 Oct');
+  eq(marked(2026, 9, l, e, '2026-10-17', 'isToday'), [17], 'today marked from the local date given');
+  const h = getHomeSummary(viva(B(28, 5), l), '2026-10-17');
+  eq([h.cycleDay, h.nextPeriodText, h.ovulationText], [cd(17), 'Expected 31 Oct 2026', '17 Oct 2026'], 'Home agrees with Calendar');
+}
+
+group('Prompt 5 · Logged end date is shown as confirmed (29 Dec – 2 Jan)');
+{
+  const l: PeriodLog[] = [{ start: '2026-12-29', end: '2027-01-02' }];
+  const e = est(B(28, 5), l, '2027-01-05');
+  eq(marked(2026, 11, l, e, '2027-01-05', 'isPeriod'), [29, 30, 31], 'December 29–31 confirmed');
+  eq(marked(2027, 0, l, e, '2027-01-05', 'isPeriod'), [1, 2], 'January 1–2 confirmed: one continuous event');
+  eq(cycleDayOn(l, '2027-01-01', '2027-01-05'), 4, 'cycle day carries across New Year (1 Jan = CD4)');
+}
+
+group('Prompt 5 · Navigating months never resets the cycle');
+{
+  const l = logs('2026-10-03');
+  const e = est(B(28, 5), l, '2026-10-17');
+  const nov = buildCalendarMonth(2026, 10, l, e, [], '2026-10-17');
+  eq(nov.find((c) => c.isCurrentMonth && c.day === 1)!.cycleDay, 30, '1 Nov is CD30, not CD1');
+  eq(marked(2026, 7, l, e, '2026-10-17', 'isPeriod'), [], 'August: no invented history before the first log');
+  eq(buildCalendarMonth(2026, 7, l, e, [], '2026-10-17').every((c) => c.cycleDay === null), true, 'August: no cycle days before the first log');
+  eq(marked(2026, 10, l, e, '2026-10-17', 'isPredictedPeriod').slice(0, 3), [1, 2, 3], 'November: predicted 1–3 (end of 31 Oct period)');
+  eq(marked(2026, 10, l, e, '2026-10-17', 'isPeriod'), [], 'November: nothing confirmed in the future');
+}
+
+group('Prompt 5 · Months, years and leap years');
+{
+  const months: [number, number][] = [[2026, 7], [2026, 8], [2026, 9], [2026, 10], [2026, 11], [2027, 0], [2027, 1], [2028, 1], [2028, 2]];
+  const sizes = months.map(([y, m]) => buildCalendarMonth(y, m, [], null, [], '2026-10-17').filter((c) => c.isCurrentMonth).length);
+  eq(sizes, [31, 30, 31, 30, 31, 31, 28, 29, 31], 'Aug–Dec 2026, Jan–Feb 2027, Feb–Mar 2028 have the right number of days');
+  const grids = months.map(([y, m]) => buildCalendarMonth(y, m, [], null, [], '2026-10-17'));
+  eq(grids.every((g) => g.length % 7 === 0), true, 'every month grid is whole weeks');
+  const lf = logs('2028-02-10');
+  const ef = est(B(28, 5), lf, '2028-02-20');
+  eq(ef.estimatedNextPeriod, '2028-03-09', 'Feb 2028 (leap) → next period 9 Mar');
+  eq(cycleDayOn(lf, '2028-02-29', '2028-02-20'), 20, '29 Feb 2028 exists and is CD20');
+  eq(cycleDayOn(lf, '2028-03-01', '2028-02-20'), 21, '1 Mar 2028 = CD21');
+  eq(cycleDayOn(logs('2027-02-10'), '2027-03-01', '2027-02-20'), 20, '1 Mar 2027 = CD20 (no 29 Feb)');
+}
+
+group('Prompt 5 · Late, early and missed periods on the Calendar');
+{
+  const late = logs('2026-09-05', '2026-10-06');
+  const eL = est(B(28, 5), late, '2026-10-08');
+  eq(marked(2026, 9, late, eL, '2026-10-08', 'isPeriod'), [6], 'late: 6 Oct confirmed');
+  eq(marked(2026, 9, late, eL, '2026-10-08', 'isPredictedPeriod').filter((d) => d < 6), [], 'late: no 3–5 Oct prediction left');
+  eq(cycleDayOn(late, '2026-10-08', '2026-10-08'), 3, 'late: 8 Oct = CD3');
+  const early = logs('2026-09-05', '2026-09-30');
+  const eE = est(B(28, 5), early, '2026-10-02');
+  eq(marked(2026, 9, early, eE, '2026-10-02', 'isPredictedPeriod').filter((d) => d <= 7), [1, 2, 3, 4], 'early: Oct shows only the 30 Sep period (1–4 estimated), no old 3–7 prediction');
+  eq(eE.estimatedNextPeriod, '2026-10-28', 'early: next predicted from 30 Sep');
+  const missed = logs('2026-10-03');
+  const eM = est(B(28, 5), missed, '2026-11-02');
+  eq(marked(2026, 9, missed, eM, '2026-11-02', 'isPeriod'), [3], 'missed: 31 Oct is NOT confirmed');
+  eq(marked(2026, 9, missed, eM, '2026-11-02', 'isPredictedPeriod').includes(31), true, '31 Oct stays a prediction');
+  eq(eM.currentCycleStart, '2026-10-03', 'cycle stays anchored to 3 Oct');
+  eq(cycleDayOn(missed, '2026-11-02', '2026-11-02'), 31, '2 Nov = CD31 (no automatic reset)');
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');

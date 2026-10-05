@@ -389,3 +389,13 @@ export function applyPeriodCorrection(
   const next = sortLogs([...logs.filter(l => l.start !== oldStart), { start: newStart }]);
   return { result: { kind: 'replaced', replaced: oldStart }, logs: next };
 }
+
+/**
+ * Cycle day for ANY date, counted from the latest CONFIRMED period start on or
+ * before it. Predictions never restart the count; null before the first log.
+ */
+export function cycleDayOn(logs: PeriodLog[], date: DateStr, today: DateStr = todayLocal()): number | null {
+  const starts = sortedStarts(logs, today).filter(s => diffDays(date, s) >= 0);
+  if (starts.length === 0) return null;
+  return diffDays(date, starts[starts.length - 1]) + 1;
+}

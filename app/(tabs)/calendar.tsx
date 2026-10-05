@@ -11,13 +11,13 @@ import SettingsRow from '../../components/SettingsRow';
 import TipCard from '../../components/TipCard';
 import { monthLabel } from '../../constants/cycleData';
 import { buildCalendarMonth } from '../../constants/calendarModel';
-import { useCycleLog } from '../../constants/cycleStore';
 import { colors, spacing } from '../../constants/theme';
-import { calculateCycle, todayLocal } from '../../lib/cycleEngine';
+import { calculateCycle } from '../../lib/cycleEngine';
+import { useToday } from '../../lib/useToday';
 import { useVivaStore } from '../../lib/vivaStore';
 
 export default function CalendarScreen() {
-  const today = todayLocal();
+  const today = useToday();
   const todayDate = useMemo(() => {
     const [y, m, d] = today.split('-').map(Number);
     return new Date(y, m - 1, d);
@@ -30,19 +30,15 @@ export default function CalendarScreen() {
     [viva.baseline, viva.periods, today]
   );
 
-  // Sexual-activity markers still come from the older log store (unchanged)
-  const sexLog = useCycleLog();
-  const sexDates = useMemo(
-    () => sexLog.sexualActivity.filter((e) => e.hadActivity).map((e) => e.date),
-    [sexLog]
-  );
+  // Sexual activity is not an approved VIVA feature: no markers are drawn
+  const sexDates: string[] = [];
 
   const [year, setYear] = useState(todayDate.getFullYear());
   const [monthIndex, setMonthIndex] = useState(todayDate.getMonth());
 
   const days = useMemo(
     () => buildCalendarMonth(year, monthIndex, viva.periods, est, sexDates, today),
-    [year, monthIndex, viva.periods, est, sexDates, today]
+    [year, monthIndex, viva.periods, est, today]
   );
 
   const goPrevMonth = () => {

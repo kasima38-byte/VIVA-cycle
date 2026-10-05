@@ -5,10 +5,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, radius, spacing } from '../../constants/theme';
 
 export default function AddScreen() {
-  const openNotes = () => {
-    // Notes destination does not yet exist — placeholder only.
-    console.log('Notes tapped — no destination yet');
-  };
 
   return (
     <View style={styles.root}>
@@ -32,16 +28,16 @@ export default function AddScreen() {
 
           <Pressable
             style={styles.card}
-            onPress={openNotes}
+            onPress={() => router.push('/daily-tracking')}
             accessibilityRole="button"
-            accessibilityLabel="Notes. Add a note about your cycle."
+            accessibilityLabel="Daily tracking. Record how you feel today."
           >
             <View style={styles.iconCircle}>
-              <Ionicons name="document-text" size={24} color={colors.magenta} />
+              <Ionicons name="today" size={24} color={colors.magenta} />
             </View>
             <View style={styles.textWrap}>
-              <Text style={styles.title}>Notes</Text>
-              <Text style={styles.subtitle}>Add a note about your cycle.</Text>
+              <Text style={styles.title}>Daily tracking</Text>
+              <Text style={styles.subtitle}>Record how you feel today.</Text>
             </View>
             <Ionicons name="chevron-forward" size={22} color={colors.magenta} />
           </Pressable>

@@ -2,12 +2,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 import { colors, radius, spacing } from '../constants/theme';
 
-const items: { label: string; color: string; icon?: 'heart' }[] = [
+const items: { label: string; color: string; border?: string; icon?: 'heart' }[] = [
   { label: 'Period', color: colors.magenta },
-  { label: 'Fertile window', color: colors.pinkSoft },
-  { label: 'Ovulation', color: '#8B45E8' },
-  { label: 'Sex', color: colors.magenta, icon: 'heart' },
-  { label: 'Note', color: colors.mutedGray },
+  { label: 'Predicted period', color: colors.pinkSoft, border: colors.magenta + '55' },
+  { label: 'Estimated fertile window', color: colors.lightPurple, border: colors.ovulationPurple + '33' },
+  { label: 'Estimated ovulation', color: colors.ovulationPurple },
 ];
 
 export default function CalendarLegend() {
@@ -18,7 +17,7 @@ export default function CalendarLegend() {
           {item.icon === 'heart' ? (
             <Ionicons name="heart" size={12} color={item.color} />
           ) : (
-            <View style={[styles.dot, { backgroundColor: item.color }]} />
+            <View style={[styles.dot, { backgroundColor: item.color }, item.border ? { borderWidth: 1, borderColor: item.border } : null]} />
           )}
           <Text style={styles.label}>{item.label}</Text>
         </View>

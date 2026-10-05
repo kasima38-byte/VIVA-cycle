@@ -6,12 +6,14 @@ import CycleProgressArc from '../../components/CycleProgressArc';
 import MiniIconRow from '../../components/MiniIconRow';
 import OutlinedButton from '../../components/OutlinedButton';
 import { firstName, getHomeSummary, greeting } from '../../constants/homeData';
+import { useToday } from '../../lib/useToday';
 import { useVivaStore } from '../../lib/vivaStore';
 import { colors, radius, spacing } from '../../constants/theme';
 
 export default function HomeScreen() {
   const viva = useVivaStore();
-  const summary = getHomeSummary(viva);
+  const today = useToday();
+  const summary = getHomeSummary(viva, today);
   const name = firstName(viva.name);
   
   return (

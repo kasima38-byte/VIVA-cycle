@@ -1,12 +1,18 @@
 // VIVA Cycle — calendar month model
 // Draws ONLY what lib/cycleEngine.ts calculates. No cycle maths happens here
-// beyond laying dates onto the month grid.
+// beyond laying engine dates onto the month grid.
+//
+//  CONFIRMED period  = a day the user actually logged (start day, plus the
+//                      days up to a logged end date when one exists)
+//  PREDICTED period  = engine estimate: future periods, and the remaining
+//                      days of a logged period whose end hasn't been recorded
 
 import { DayInfo } from './cycleData';
-import { addDays, CycleEstimate, diffDays, PeriodLog, predictCycles } from '../lib/cycleEngine';
+import { addDays, CycleEstimate, cycleDayOn, diffDays, PeriodLog, predictCycles } from '../lib/cycleEngine';
 
 export type DayModel = DayInfo & {
   isPredictedPeriod: boolean;
+  cycleDay: number | null; // from the engine; null before the first logged period
 };
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -24,24 +30,28 @@ export function buildCalendarMonth(
   sexDates: string[],
   todayKey: string
 ): DayModel[] {
-  const periodDays = new Set<string>();
+  const confirmedDays = new Set<string>();
   const predictedDays = new Set<string>();
   const fertileDays = new Set<string>();
   const ovulationDays = new Set<string>();
 
-  // 1. Confirmed periods (facts). Until period-end logging exists, a period
-  //    without an end date is drawn with the period length in use.
+  // 1. Confirmed periods (facts only — no bleeding length is invented)
   const starts = Array.from(new Set(periods.map((p) => p.start))).sort();
   const plen = est ? est.periodLengthUsed : 5;
   starts.forEach((start, i) => {
-    const log = periods.find((p) => p.start === start);
-    let end = log?.end ?? addDays(start, plen - 1);
     const next = starts[i + 1];
-    if (next && diffDays(next, end) <= 0) end = addDays(next, -1); // never overlap the next period
-    addRange(periodDays, start, end);
+    const cap = (end: string) => (next && diffDays(next, end) <= 0 ? addDays(next, -1) : end);
+    const log = periods.find((p) => p.start === start);
+    if (log?.end) {
+      addRange(confirmedDays, start, cap(log.end));
+    } else {
+      confirmedDays.add(start);
+      // Remaining days use the usual period length: an ESTIMATE, drawn as predicted
+      if (plen > 1) addRange(predictedDays, addDays(start, 1), cap(addDays(start, plen - 1)));
+    }
   });
 
-  // 2. Predictions (estimates). While a period is late, only the overdue
+  // 2. Predictions from the engine. While a period is late, only the overdue
   //    prediction is shown — nothing further is projected.
   if (est) {
     predictCycles(est, est.isLate ? 1 : 4).forEach((c) => {
@@ -58,11 +68,12 @@ export function buildCalendarMonth(
     day,
     isCurrentMonth: inMonth,
     isToday: dateKey === todayKey,
-    isPeriod: periodDays.has(dateKey),
-    isPredictedPeriod: predictedDays.has(dateKey) && !periodDays.has(dateKey),
+    isPeriod: confirmedDays.has(dateKey),
+    isPredictedPeriod: predictedDays.has(dateKey) && !confirmedDays.has(dateKey),
     isFertile: fertileDays.has(dateKey),
     isOvulation: ovulationDays.has(dateKey),
     isSexLogged: sex.has(dateKey),
+    cycleDay: cycleDayOn(periods, dateKey, todayKey),
   });
 
   const lead = (new Date(year, monthIndex, 1).getDay() + 6) % 7;
