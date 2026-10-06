@@ -33,6 +33,7 @@ export interface VivaData {
   goal: Goal | null;     // null until she chooses one
   periods: PeriodLog[];  // confirmed periods, oldest → newest
   dailyLogs: Record<string, DailyLog>; // Daily Tracking entries by date
+  reminders: Record<string, boolean>;  // Notification switches (all off until she turns one on)
 }
 
 export interface VivaState extends VivaData {
@@ -49,6 +50,7 @@ const EMPTY: VivaData = {
   goal: null,
   periods: [],
   dailyLogs: {},
+  reminders: {},
 };
 
 let state: VivaState = { ...EMPTY, loaded: false, loadError: false };
@@ -114,6 +116,7 @@ function parseSaved(raw: string): VivaData {
     baseline: { ...EMPTY.baseline, ...(saved.baseline ?? {}) },
     periods: sortPeriods(periods),
     dailyLogs: saved.dailyLogs && typeof saved.dailyLogs === 'object' && !Array.isArray(saved.dailyLogs) ? saved.dailyLogs : {},
+    reminders: saved.reminders && typeof saved.reminders === 'object' && !Array.isArray(saved.reminders) ? saved.reminders : {},
     version: SCHEMA_VERSION,
   };
 }
@@ -208,6 +211,11 @@ export function removePeriod(start: DateStr): 'removed' | 'notFound' | 'lastOne'
   const { result, logs } = applyPeriodRemoval(state.periods, start);
   if (result.kind === 'removed') update({ periods: logs });
   return result.kind;
+}
+
+/** Turn one reminder on or off. */
+export function setReminder(key: string, on: boolean) {
+  update({ reminders: { ...state.reminders, [key]: on } });
 }
 
 /** Save one day of Daily Tracking (merged with anything already saved that day). */

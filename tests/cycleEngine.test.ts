@@ -12,6 +12,7 @@ import { buildCycleRecords } from '../constants/insightsData';
 import { calculateCycleRegularity } from '../constants/insightsCalc';
 import { getProfileStats } from '../constants/profileData';
 import type { VivaState } from '../lib/vivaStore';
+import { planReminders, REMINDER_KEYS } from '../lib/reminders';
 
 declare const process: { exitCode?: number; env: Record<string, string | undefined> };
 
@@ -37,7 +38,7 @@ const logs = (...starts: string[]): PeriodLog[] => starts.map((start) => ({ star
 const est = (b: CycleBaseline, l: PeriodLog[], today: string) => calculateCycle(b, l, today)!;
 const viva = (b: CycleBaseline, l: PeriodLog[]): VivaState => ({
   loaded: true, loadError: false, version: 1, setupComplete: true, name: 'Sarah', dateOfBirth: null,
-  baseline: b, goal: 'conceive', periods: l, dailyLogs: {},
+  baseline: b, goal: 'conceive', periods: l, dailyLogs: {}, reminders: {},
 });
 const marked = (year: number, month: number, l: PeriodLog[], e: ReturnType<typeof est>, today: string,
   key: 'isPeriod' | 'isPredictedPeriod' | 'isFertile' | 'isOvulation' | 'isToday') =>
@@ -516,6 +517,37 @@ group('Period history · edit and delete (M3)');
   eq(est(B(28, 5), delLatest.logs, '2026-11-10').currentCycleStart, '2026-10-06', 'deleting the latest re-anchors to the previous one');
   eq(applyPeriodRemoval(logs('2026-10-06'), '2026-10-06').result.kind, 'lastOne', 'the only period cannot be deleted');
   eq(applyPeriodRemoval(h, '2026-12-01').result.kind, 'notFound', 'unknown date: nothing happens');
+}
+
+group('Reminders · planned from the engine, worded as estimates');
+{
+  const base = (rem: Record<string, boolean>, goal: any = 'track', l = logs('2026-10-03')) =>
+    ({ baseline: B(28, 5), periods: l, goal, reminders: rem });
+  eq(planReminders(base({}), '2026-10-10').length, 0, 'all switches off → nothing scheduled');
+  const p = planReminders(base({ period: true }), '2026-10-10');
+  eq(p.map((r) => r.trigger), [
+    { kind: 'date', date: '2026-10-29', hour: 9, minute: 0 },
+    { kind: 'date', date: '2026-11-26', hour: 9, minute: 0 },
+    { kind: 'date', date: '2026-12-24', hour: 9, minute: 0 },
+  ], 'period: 2 days before each of the next 3 estimated periods (31 Oct, 28 Nov, 26 Dec)');
+  const f = planReminders(base({ fertile: true, ovulation: true }), '2026-10-10');
+  eq(f.filter((r) => r.key === 'fertile').map((r) => (r.trigger as any).date), ['2026-11-07', '2026-12-05'],
+    'fertile: day before each window (this cycle\'s 11 Oct already passed)');
+  eq(f.filter((r) => r.key === 'ovulation').map((r) => (r.trigger as any).date), ['2026-10-15', '2026-11-12', '2026-12-10'],
+    'ovulation: day before each estimated ovulation (16 Oct, 13 Nov, 11 Dec)');
+  const avoid = planReminders(base({ fertile: true, ovulation: true }, 'avoid'), '2026-10-10');
+  eq(avoid.every((r) => r.body.includes('not contraception') && !/safe/i.test(r.title + r.body)), true, 'avoid: every cycle reminder says not contraception, never "safe"');
+  eq(f.filter((r) => r.key === 'ovulation').every((r) => r.body.includes('not a confirmed event')), true, 'ovulation reminders say estimate, not confirmed');
+  const all = planReminders(base(Object.fromEntries(REMINDER_KEYS.map((k) => [k, true]))), '2026-10-10');
+  eq(all.filter((r) => r.trigger.kind === 'date').every((r) => (r.trigger as any).date > '2026-10-10'), true, 'nothing scheduled in the past');
+  eq(new Set(all.map((r) => r.id)).size, all.length, 'no duplicate reminders');
+  eq(all.length <= 60, true, 'stays under the iOS limit of 64 scheduled notifications (' + all.length + ')');
+  eq(all.filter((r) => r.key === 'water').length, 3, 'water: 3 times a day');
+  eq(all.filter((r) => r.key === 'tips').map((r) => new Date((r.trigger as any).date + 'T12:00:00Z').getUTCDay()), [1, 1, 1, 1, 1, 1, 1, 1], 'tips: 8, each on a Monday');
+  const late = planReminders(base({ period: true, fertile: true, ovulation: true }), '2026-11-10');
+  eq(late.length, 0, 'period late → no cycle reminders (dates unknown)');
+  const after = planReminders(base({ period: true }, 'track', logs('2026-10-03', '2026-11-08')), '2026-11-10');
+  eq((after[0].trigger as any).date, '2026-12-04', 'after logging 8 Nov, reminders follow the new cycle (6 Dec period)');
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');

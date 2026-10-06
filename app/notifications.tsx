@@ -1,12 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import IntroCard from '../components/IntroCard';
 import NotificationRow, { NotificationRowProps } from '../components/NotificationRow';
 import PrivacyInfoCard from '../components/PrivacyInfoCard';
 import { colors, spacing } from '../constants/theme';
+import { ensureReminderPermission } from '../lib/notifications';
+import { setReminder, useVivaStore } from '../lib/vivaStore';
 
 type RowConfig = Omit<NotificationRowProps, 'value' | 'onValueChange' | 'isLast'> & { key: string };
 
@@ -91,17 +92,6 @@ const appUpdates: RowConfig[] = [
   },
 ];
 
-const initialState: Record<string, boolean> = {
-  period: true,
-  ovulation: true,
-  fertile: true,
-  summary: true,
-  medication: true,
-  water: false,
-  activity: false,
-  selfcare: true,
-  tips: true,
-};
 
 function GroupedRows({
   rows,
@@ -117,7 +107,7 @@ function GroupedRows({
       {rows.map((row, i) => (
         <NotificationRow
           {...row}
-          value={values[row.key]}
+          value={!!values[row.key]}
           onValueChange={(next) => onToggle(row.key, next)}
           isLast={i === rows.length - 1}
         />
@@ -127,10 +117,28 @@ function GroupedRows({
 }
 
 export default function NotificationsScreen() {
-  const [values, setValues] = useState(initialState);
+  // Saved switches; everything is off until she turns it on
+  const { reminders } = useVivaStore();
+  const values: Record<string, boolean> = reminders;
 
-  const handleToggle = (key: string, next: boolean) => {
-    setValues((prev) => ({ ...prev, [key]: next }));
+  const handleToggle = async (key: string, next: boolean) => {
+    if (!next) {
+      setReminder(key, false);
+      return;
+    }
+    const allowed = await ensureReminderPermission();
+    if (!allowed) {
+      Alert.alert(
+        'Notifications are off for VIVA',
+        'To get reminders, allow notifications for VIVA in your phone settings.',
+        [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Open settings', onPress: () => Linking.openSettings() },
+        ]
+      );
+      return;
+    }
+    setReminder(key, true);
   };
 
   return (

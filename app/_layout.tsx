@@ -1,15 +1,22 @@
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { useEffect } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { loadVivaStore, retryLoadVivaStore, useVivaStore } from '../lib/vivaStore';
+import { listenForReminderTaps, syncReminders } from '../lib/notifications';
+import { getVivaState, loadVivaStore, retryLoadVivaStore, useVivaStore } from '../lib/vivaStore';
 
 export default function RootLayout() {
-  const { loaded, loadError } = useVivaStore();
+  const { loaded, loadError, periods, baseline, goal, reminders } = useVivaStore();
 
   useEffect(() => {
     loadVivaStore();
+    return listenForReminderTaps((url) => router.push(url as any));
   }, []);
+
+  // Rebuild reminders whenever anything they depend on changes (and on every launch)
+  useEffect(() => {
+    if (loaded && !loadError) syncReminders(getVivaState());
+  }, [loaded, loadError, periods, baseline, goal, reminders]);
 
   if (!loaded) {
     return (
