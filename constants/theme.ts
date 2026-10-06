@@ -22,6 +22,15 @@ export const colors = {
   risingOrange: '#E58B2E',
 };
 
+/** One palette for cycle markers, used everywhere on the Fertility screen. */
+export const cycleColors = {
+  period: '#E9006F',      // VIVA magenta
+  fertile: '#DCCBFB',     // light lavender
+  ovulation: '#8B45E8',   // stronger purple
+  other: '#E4E8F0',       // soft gray
+  track: '#F1ECF6',       // empty ring track
+};
+
 export const spacing = {
   xs: 4,
   sm: 8,

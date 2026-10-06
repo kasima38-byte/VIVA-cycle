@@ -1,5 +1,5 @@
 import Svg, { Circle, Path } from 'react-native-svg';
-import { colors } from '../constants/theme';
+import { colors, cycleColors } from '../constants/theme';
 
 // Small, data-driven cycle illustration: one ring = one cycle, starting at the top.
 // Pink arc = period days, lavender arc = estimated fertile window,
@@ -38,14 +38,14 @@ export default function CycleRing({
 
   return (
     <Svg width={size} height={size} accessible={false}>
-      <Circle cx={c} cy={c} r={r} stroke="#F1E8F8" strokeWidth={STROKE} fill="none" />
+      <Circle cx={c} cy={c} r={r} stroke={cycleColors.track} strokeWidth={STROKE} fill="none" />
       {periodDays > 0 && (
-        <Path d={arc(1, periodDays)} stroke="#F6B6D3" strokeWidth={STROKE} strokeLinecap="round" fill="none" />
+        <Path d={arc(1, periodDays)} stroke={cycleColors.period} strokeWidth={STROKE} strokeLinecap="round" fill="none" />
       )}
       {fertileEndDay >= fertileStartDay && (
-        <Path d={arc(Math.max(1, fertileStartDay), fertileEndDay)} stroke="#CDB0F7" strokeWidth={STROKE} strokeLinecap="round" fill="none" />
+        <Path d={arc(Math.max(1, fertileStartDay), fertileEndDay)} stroke={cycleColors.fertile} strokeWidth={STROKE} strokeLinecap="round" fill="none" />
       )}
-      <Circle cx={ov.x} cy={ov.y} r={7} fill={colors.ovulationPurple} stroke={colors.white} strokeWidth={2} />
+      <Circle cx={ov.x} cy={ov.y} r={7} fill={cycleColors.ovulation} stroke={colors.white} strokeWidth={2} />
       {today && <Circle cx={today.x} cy={today.y} r={6.5} fill={colors.white} stroke={colors.magenta} strokeWidth={3} />}
     </Svg>
   );

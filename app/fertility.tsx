@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import CycleMonthCard, { DayKind } from '../components/CycleMonthCard';
 import CycleRing from '../components/CycleRing';
 import SegmentedTabs from '../components/SegmentedTabs';
 import { colors, spacing } from '../constants/theme';
@@ -17,6 +18,7 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 const day = (k: string) => Number(k.slice(8, 10));
 const mon = (k: string) => MONTHS[Number(k.slice(5, 7)) - 1];
 const short = (k: string) => day(k) + ' ' + mon(k);
+const full = (a: string, b: string) => (a === b ? short(a) : short(a) + ' – ' + short(b));
 /** "12–17 Oct", or "29 Oct – 3 Nov" across months */
 const range = (a: string, b: string) => (mon(a) === mon(b) ? day(a) + '–' + short(b) : short(a) + ' – ' + short(b));
 
@@ -83,6 +85,33 @@ export default function FertilityScreen() {
       }
     : null;
 
+  // Section 2: this cycle's markers and one-dot-per-day timeline (current cycle)
+  const month = useMemo(() => {
+    if (!est) return null;
+    const start = est.currentCycleStart;
+    const periodEnd = addDays(start, est.periodLengthUsed - 1);
+    const fw = est.estimatedFertileWindow;
+    // While late, extend the line so today stays on it
+    const length = Math.max(est.cycleLengthUsed, est.currentCycleDay);
+    const days: DayKind[] = [];
+    for (let i = 0; i < length; i++) {
+      const d = addDays(start, i);
+      if (d === est.estimatedOvulation) days.push('ovulation');
+      else if (diffDays(d, fw.start) >= 0 && diffDays(fw.end, d) >= 0) days.push('fertile');
+      else if (diffDays(periodEnd, d) >= 0) days.push('period');
+      else days.push('other');
+    }
+    return {
+      periodText: full(start, periodEnd),
+      fertileText: full(fw.start, fw.end),
+      ovulationText: est.ovulationIsVariable
+        ? 'Around ' + range(est.ovulationRange.start, est.ovulationRange.end)
+        : short(est.estimatedOvulation),
+      days,
+      todayIndex: est.currentCycleDay - 1,
+    };
+  }, [est]);
+
   return (
     <View style={styles.root}>
       <SafeAreaView style={styles.safe} edges={['top']}>
@@ -144,6 +173,17 @@ export default function FertilityScreen() {
               </Text>
             </View>
           </View>
+
+          {month ? (
+            <CycleMonthCard
+              periodText={month.periodText}
+              fertileText={month.fertileText}
+              ovulationText={month.ovulationText}
+              days={month.days}
+              todayIndex={month.todayIndex}
+              onViewCalendar={() => router.push('/(tabs)/calendar')}
+            />
+          ) : null}
         </ScrollView>
       </SafeAreaView>
     </View>
