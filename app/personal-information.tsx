@@ -22,6 +22,7 @@ import { colors, radius, spacing } from '../constants/theme';
 type Errors = { name?: string; email?: string; phone?: string; dob?: string };
 
 function toDate(key: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return new Date(2000, 0, 1); // date of birth not set yet
   const [y, m, d] = key.split('-').map(Number);
   return new Date(y, m - 1, d);
 }
@@ -33,6 +34,7 @@ function toKey(d: Date) {
 }
 
 function formatDisplay(key: string) {
+  if (!key) return 'Not set';
   return toDate(key).toLocaleDateString(undefined, {
     day: 'numeric',
     month: 'long',

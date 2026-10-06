@@ -5,7 +5,8 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import BottomSheet from '../components/BottomSheet';
 import { colors, radius, spacing } from '../constants/theme';
-import { Goal, Regularity } from '../lib/cycleEngine';
+import { calculateCycle, Goal, Regularity } from '../lib/cycleEngine';
+import { useToday } from '../lib/useToday';
 import { setGoal, updateBaseline, useVivaStore } from '../lib/vivaStore';
 
 // Settings change the BASELINE only. Confirmed period history is never touched.
@@ -34,7 +35,15 @@ const regularityLabel = (r: Regularity) => REGULARITY_OPTIONS.find((o) => o.key 
 const daysLabel = (n: number | null) => (n === null ? 'Not sure' : n + ' days');
 
 export default function CycleSettingsScreen() {
-  const { baseline, goal } = useVivaStore();
+  const { baseline, goal, periods } = useVivaStore();
+  const today = useToday();
+  // What predictions actually use: once 2+ cycles are logged, her observed
+  // average replaces this setting (the setting itself is kept as entered).
+  const est = calculateCycle(baseline, periods, today);
+  const cycleSubtitle =
+    est && est.lengthSource === 'history'
+      ? 'Predictions now use your logged average: ' + est.cycleLengthUsed + ' days'
+      : 'Usually between 21 and 35 days';
   const [open, setOpen] = useState<Open>(null);
 
   const step = (field: 'cycleLength' | 'periodLength', delta: number) => {
@@ -46,7 +55,7 @@ export default function CycleSettingsScreen() {
 
   const rows: { key: Exclude<Open, null>; icon: React.ComponentProps<typeof Ionicons>['name']; title: string; subtitle: string; value: string }[] = [
     { key: 'goal', icon: 'flag', title: 'My goal', subtitle: 'Tailors the guidance you see', value: goalLabel(goal) },
-    { key: 'cycle', icon: 'sync', title: 'Usual cycle length', subtitle: 'Usually between 21 and 35 days', value: daysLabel(baseline.cycleLength) },
+    { key: 'cycle', icon: 'sync', title: 'Usual cycle length', subtitle: cycleSubtitle, value: daysLabel(baseline.cycleLength) },
     { key: 'period', icon: 'water', title: 'Usual period length', subtitle: 'Usually between 2 and 7 days', value: daysLabel(baseline.periodLength) },
     { key: 'regularity', icon: 'pulse', title: 'Cycle regularity', subtitle: 'How much your cycle length changes', value: regularityLabel(baseline.regularity) },
   ];

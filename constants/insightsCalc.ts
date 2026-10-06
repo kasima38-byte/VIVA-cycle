@@ -68,10 +68,9 @@ export function calculateMoodPattern(records: CycleRecord[]): string {
   return 'Mixed';
 }
 
-export function calculateTypicalFertileWindow(records: CycleRecord[]): string {
-  const avg = average(records.map((r) => r.fertileWindowLength));
-  if (avg === null) return 'Not enough data';
-  return `Typically ${Math.round(avg)} days`;
+export function calculateTypicalFertileWindow(_records: CycleRecord[]): string {
+  // The engine always estimates a 6-day window (5 days before estimated ovulation + that day)
+  return 'Estimated 6 days';
 }
 
 export function generatePersonalInsight(records: CycleRecord[]): string | null {

@@ -46,8 +46,11 @@ export function buildCalendarMonth(
       addRange(confirmedDays, start, cap(log.end));
     } else {
       confirmedDays.add(start);
-      // Remaining days use the usual period length: an ESTIMATE, drawn as predicted
-      if (plen > 1) addRange(predictedDays, addDays(start, 1), cap(addDays(start, plen - 1)));
+      // Current period only: remaining days use the usual period length — an
+      // ESTIMATE, drawn as predicted. Past periods show only what was logged,
+      // so changing Settings can never repaint history.
+      const isCurrent = est ? start === est.currentCycleStart : i === starts.length - 1;
+      if (isCurrent && plen > 1) addRange(predictedDays, addDays(start, 1), cap(addDays(start, plen - 1)));
     }
   });
 

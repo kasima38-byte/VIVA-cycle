@@ -8,6 +8,8 @@ import {
 import { buildCalendarMonth } from '../constants/calendarModel';
 import { dateToKey, isValidDateKey, keyToLocalDate } from '../constants/dateUtils';
 import { getHomeSummary } from '../constants/homeData';
+import { buildCycleRecords } from '../constants/insightsData';
+import { getProfileStats } from '../constants/profileData';
 import type { VivaState } from '../lib/vivaStore';
 
 declare const process: { exitCode?: number; env: Record<string, string | undefined> };
@@ -393,6 +395,83 @@ group('Prompt 6 · New period re-anchors all fertility estimates');
   eq(after.estimatedFertileWindow, { start: '2026-10-14', end: '2026-10-19' }, 'new window 14–19 Oct; no stale 16 Oct estimate');
   const nextCycle = applyPeriodLog(logs('2026-09-05'), '2026-10-06', '2026-10-06').logs;
   eq(est(B(28, 5), nextCycle, '2026-10-06').estimatedOvulation, '2026-10-19', 'late period (5 Sep → 6 Oct): ovulation recalculated from 6 Oct');
+}
+
+group('Prompt 7 · TEST A + E  Cycle length 28 → 30 (logged 6 Oct, today 15 Oct)');
+{
+  const l = logs('2026-10-06');
+  const before = JSON.stringify(l);
+  const e28 = est(B(28, 5), l, '2026-10-15');
+  const e30 = est(B(30, 5), l, '2026-10-15');
+  eq([e28.estimatedNextPeriod, e30.estimatedNextPeriod], ['2026-11-03', '2026-11-05'], 'next period 3 Nov → 5 Nov');
+  eq([e28.estimatedOvulation, e30.estimatedOvulation], ['2026-10-19', '2026-10-21'], 'estimated ovulation follows (CD14 → CD16)');
+  eq([e28.estimatedFertileWindow.start, e30.estimatedFertileWindow.start], ['2026-10-14', '2026-10-16'], 'fertile window follows');
+  eq([e28.currentCycleDay, e30.currentCycleDay], [10, 10], '15 Oct stays CD10');
+  eq([e28.currentCycleStart, e30.currentCycleStart], ['2026-10-06', '2026-10-06'], 'current cycle start unchanged');
+  eq(JSON.stringify(l), before, 'confirmed period untouched');
+}
+
+group('Prompt 7 · TEST B  Period duration 5 → 6');
+{
+  const past: PeriodLog[] = [{ start: '2026-10-03', end: '2026-10-07' }, { start: '2026-10-31' }];
+  const e5 = est(B(28, 5), past, '2026-11-02');
+  const e6 = est(B(28, 6), past, '2026-11-02');
+  eq(marked(2026, 9, past, e6, '2026-11-02', 'isPeriod').filter((d) => d < 10), [3, 4, 5, 6, 7], 'logged 3–7 Oct stays 3–7 (not 3–8)');
+  eq([e5.estimatedPeriodWindow.end, e6.estimatedPeriodWindow.end], ['2026-12-02', '2026-12-03'], 'future predicted period: 5 → 6 days');
+  const noEnd = logs('2026-09-05', '2026-10-03');
+  const a = buildCalendarMonth(2026, 8, noEnd, est(B(28, 5), noEnd, '2026-10-05'), [], '2026-10-05');
+  const b = buildCalendarMonth(2026, 8, noEnd, est(B(28, 8), noEnd, '2026-10-05'), [], '2026-10-05');
+  const sep = (m: typeof a) => m.filter((c) => c.isCurrentMonth && (c.isPeriod || c.isPredictedPeriod)).map((c) => c.day);
+  eq([sep(a), sep(b)], [[5], [5]], 'a PAST period without an end date is not repainted by Settings');
+}
+
+group('Prompt 7 · TEST C  Regularity regular → often irregular');
+{
+  const l = logs('2026-10-06');
+  const r = est(B(28, 5, 'regular'), l, '2026-10-10');
+  const i = est(B(28, 5, 'irregular'), l, '2026-10-10');
+  eq([r.estimatedNextPeriod, i.estimatedNextPeriod], ['2026-11-03', '2026-11-03'], 'same estimated dates');
+  eq([r.ovulationIsVariable, i.ovulationIsVariable], [false, true], 'irregular shows ovulation as a range');
+  eq([r.nextPeriodRange.end, i.nextPeriodRange.end], ['2026-11-05', '2026-11-10'], 'wider uncertainty range');
+}
+
+group('Prompt 7 · TEST D  Goal change (both directions)');
+{
+  const l = logs('2026-09-05', '2026-10-06');
+  const s1 = getHomeSummary({ ...viva(B(28, 5), l), goal: 'conceive' }, '2026-10-15');
+  const s2 = getHomeSummary({ ...viva(B(28, 5), l), goal: 'avoid' }, '2026-10-15');
+  const s3 = getHomeSummary({ ...viva(B(28, 5), l), goal: 'conceive' }, '2026-10-15');
+  const core = (x: typeof s1) => [x.cycleDay, x.nextPeriodText, x.ovulationText, x.fertileRange];
+  eq([core(s2), core(s3)], [core(s1), core(s1)], 'conceive → avoid → conceive: identical cycle data');
+  eq(s1.goalNote === s2.goalNote, false, 'only the guidance changes');
+  eq(completedCycles(l).map((c) => c.length), [31], 'history still 31 days');
+}
+
+group('Prompt 7 · TEST F + section 14/21  History never changes with Settings');
+{
+  const h = logs('2026-08-09', '2026-09-05', '2026-10-06', '2026-11-04');
+  const snap = JSON.stringify(h);
+  const recA = buildCycleRecords(h).map((r) => r.cycleLength);
+  for (const len of [28, 30, 32]) est(B(len, 5), h, '2026-11-10');
+  eq(JSON.stringify(h), snap, 'dates exactly the same after 28 / 30 / 32');
+  eq(recA, [27, 31, 29], 'observed cycles 27, 31, 29 days (Insights records)');
+  eq(buildCycleRecords(h).map((r) => r.cycleLength), recA, 'Insights records unchanged by Settings');
+  const three = logs('2026-10-06', '2026-11-04', '2026-12-03');
+  eq(completedCycles(three).map((c) => c.length), [29, 29], 'Oct 6 / Nov 4 / Dec 3 → 29 and 29 days');
+  eq(est(B(30, 5), three, '2026-12-05').cycleLengthUsed, 29, '2+ real cycles: predictions use her 29, not the 30 setting');
+  eq(getProfileStats(h), { cyclesTracked: 3, averageCycle: '29 days', averagePeriod: '–' }, 'Profile stats from real history');
+}
+
+group('Prompt 7 · Unknown baseline, then known (section 8, 20, 22)');
+{
+  const l = logs('2026-10-06');
+  const unknown = est(B(null, 5, 'not_sure'), l, '2026-10-10');
+  eq([unknown.lengthSource, unknown.cycleLengthUsed], ['default', 28], 'unknown: 28 used as a labelled fallback');
+  const h = getHomeSummary(viva(B(null, 5, 'not_sure'), l), '2026-10-10');
+  eq(h.confidenceNote.includes('Not sure'), true, 'Home says it is an assumption, not her value');
+  const known = est(B(31, 5, 'regular'), l, '2026-10-10');
+  eq([known.lengthSource, known.estimatedNextPeriod], ['baseline', '2026-11-06'], 'later entered 31 → used, next 6 Nov');
+  eq(buildCycleRecords(l).length, 0, 'no fake historical cycles from onboarding LMP alone');
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');

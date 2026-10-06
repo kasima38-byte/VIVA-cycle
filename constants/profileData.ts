@@ -1,20 +1,21 @@
+import { PeriodLog } from '../lib/cycleEngine';
 import { average, formatAverage } from './insightsCalc';
-import { cycleHistory } from './insightsData';
+import { buildCycleRecords } from './insightsData';
 
 export const userProfile = {
-  name: 'Kasima Allan',
   tagline: 'A healthier, brighter me',
 };
 
-const recent = cycleHistory.slice(-6);
-
-// Derived from the same cycle history the Insights screen uses.
-export const profileStats = {
-  cyclesTracked: recent.length,
-  averageCycle: formatAverage(average(recent.map((r) => r.cycleLength))) + ' days',
-  averagePeriod: formatAverage(average(recent.map((r) => r.periodLength))) + ' days',
-  articlesRead: 12, // demo value until article reading is tracked
-};
+/** Profile stats from her REAL logged history (same records the Insights screen uses). */
+export function getProfileStats(periods: PeriodLog[]) {
+  const recent = buildCycleRecords(periods).slice(-6);
+  const periodLengths = recent.flatMap((r) => (r.periodLength === null ? [] : [r.periodLength]));
+  return {
+    cyclesTracked: recent.length,
+    averageCycle: recent.length ? formatAverage(average(recent.map((r) => r.cycleLength))) + ' days' : '–',
+    averagePeriod: periodLengths.length ? formatAverage(average(periodLengths)) + ' days' : '–',
+  };
+}
 
 // Change this to the real VIVA Pregnancy link when you have it.
 export const PREGNANCY_LINK = 'vivapregnancy://open';

@@ -4,7 +4,8 @@ import { Alert, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ProfileStatsCard from '../../components/ProfileStatsCard';
 import SettingsRow from '../../components/SettingsRow';
-import { PREGNANCY_LINK, profileStats } from '../../constants/profileData';
+import { PREGNANCY_LINK, getProfileStats } from '../../constants/profileData';
+import { useVivaStore } from '../../lib/vivaStore';
 import { useProfile } from '../../constants/profileStore';
 import { colors, radius, spacing } from '../../constants/theme';
 
@@ -28,12 +29,6 @@ const supportRows: Row[] = [
   { icon: 'share-social', title: 'Share VIVA Cycle', subtitle: 'Help more women discover better health' },
 ];
 
-const stats: { icon: IconName; value: string; label: string }[] = [
-  { icon: 'calendar', value: String(profileStats.cyclesTracked), label: 'Cycles Tracked' },
-  { icon: 'stats-chart', value: profileStats.averageCycle, label: 'Average Cycle' },
-  { icon: 'heart', value: profileStats.averagePeriod, label: 'Average Period' },
-  { icon: 'star', value: String(profileStats.articlesRead), label: 'Articles Read' },
-];
 
 function initialsOf(name: string) {
   return name
@@ -45,6 +40,14 @@ function initialsOf(name: string) {
 }
 export default function ProfileScreen() {
   const userProfile = useProfile();
+  const { periods } = useVivaStore();
+  const profileStats = getProfileStats(periods);
+  const stats: { icon: IconName; value: string; label: string }[] = [
+    { icon: 'calendar', value: String(profileStats.cyclesTracked), label: 'Cycles Tracked' },
+    { icon: 'stats-chart', value: profileStats.averageCycle, label: 'Average Cycle' },
+    { icon: 'heart', value: profileStats.averagePeriod, label: 'Average Period' },
+    { icon: 'water', value: String(periods.length), label: 'Periods Logged' },
+  ];
   const go = (route?: string) => {
     if (route) router.push(route as any);
   };

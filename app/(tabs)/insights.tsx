@@ -6,7 +6,11 @@ import ChartCard from '../../components/ChartCard';
 import InsightSummaryCard from '../../components/InsightSummaryCard';
 import SegmentedTabs from '../../components/SegmentedTabs';
 import TipCard from '../../components/TipCard';
-import { cycleHistory } from '../../constants/insightsData';
+import { useCycleLog } from '../../constants/cycleStore';
+import { buildCycleRecords } from '../../constants/insightsData';
+import { calculateCycle } from '../../lib/cycleEngine';
+import { useToday } from '../../lib/useToday';
+import { useVivaStore } from '../../lib/vivaStore';
 import {
   CYCLE_RANGE,
   PERIOD_RANGE,
@@ -34,10 +38,17 @@ export default function InsightsScreen() {
   const [rangeLabel, setRangeLabel] = useState('This Cycle');
   const range = RANGE_LABELS[rangeLabel];
 
-  const records = useMemo(() => selectRecords(cycleHistory, range), [range]);
+  const viva = useVivaStore();
+  const { dailyLogs } = useCycleLog();
+  const today = useToday();
+  // Observed history only: completed cycles between her logged periods
+  const all = useMemo(() => buildCycleRecords(viva.periods, dailyLogs), [viva.periods, dailyLogs]);
+  const records = useMemo(() => selectRecords(all, range), [all, range]);
+  const est = useMemo(() => calculateCycle(viva.baseline, viva.periods, today), [viva.baseline, viva.periods, today]);
 
   const cycleAvg = average(records.map((r) => r.cycleLength));
-  const periodAvg = average(records.map((r) => r.periodLength));
+  const periodRecords = records.filter((r) => r.periodLength !== null);
+  const periodAvg = average(periodRecords.map((r) => r.periodLength as number));
   const regularity = calculateCycleRegularity(records);
   const symptoms = calculateCommonSymptoms(records);
   const mood = calculateMoodPattern(records);
@@ -49,10 +60,10 @@ export default function InsightsScreen() {
     value: r.cycleLength,
     current: i === records.length - 1,
   }));
-  const periodData = records.map((r, i) => ({
+  const periodData = periodRecords.map((r, i) => ({
     label: r.month,
-    value: r.periodLength,
-    current: i === records.length - 1,
+    value: r.periodLength as number,
+    current: i === periodRecords.length - 1,
   }));
 
   const heroTitle =
@@ -62,7 +73,9 @@ export default function InsightsScreen() {
       ? 'Keep tracking to discover your pattern.'
       : 'Your cycle varies a little.';
       
-  const cycleAvgText = cycleAvg === null ? '-' : formatAverage(cycleAvg) + ' days';
+  // Before any cycle is completed, show what predictions use — clearly labelled
+  const usingText = !est ? '-' : est.lengthSource === 'default' ? 'Not known yet' : est.cycleLengthUsed + ' days';
+  const cycleAvgText = cycleAvg === null ? usingText : formatAverage(cycleAvg) + ' days';
   const periodAvgText = periodAvg === null ? '-' : formatAverage(periodAvg) + ' days';
 
   return (
@@ -87,7 +100,9 @@ export default function InsightsScreen() {
 
           <View style={styles.hero}>
             <Text style={styles.heroTitle}>{heroTitle}</Text>
-            <Text style={styles.heroBody}>Your average cycle length is</Text>
+            <Text style={styles.heroBody}>
+              {cycleAvg === null ? 'Your usual cycle length (from Settings) is' : 'Your average logged cycle length is'}
+            </Text>
             <Text style={styles.heroNumber}>{cycleAvgText}</Text>
           </View>
 
@@ -103,7 +118,7 @@ export default function InsightsScreen() {
 
           <ChartCard
             title="Period Length"
-            subtitle={'Your last ' + records.length + ' periods'}
+            subtitle={periodRecords.length ? 'Your last ' + periodRecords.length + ' periods' : 'Log when a period ends to see this'}
             data={periodData}
             averageText={periodAvgText}
             withinRange={isWithin(periodAvg, PERIOD_RANGE)}

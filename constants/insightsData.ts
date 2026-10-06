@@ -1,24 +1,31 @@
+import { completedCycles, diffDays, PeriodLog } from '../lib/cycleEngine';
+import { DailyLog } from './cycleStore';
+
 export type CycleRecord = {
-  month: string;
-  cycleLength: number;
-  periodLength: number;
-  fertileWindowLength: number;
+  month: string;                 // month the cycle started
+  cycleLength: number;           // observed: start → next start (never from Settings)
+  periodLength: number | null;   // observed only when an end date was logged
+  fertileWindowLength: number;   // the engine's estimated window (6 days)
   symptoms: string[];
   moods: string[];
 };
 
-// Demo history (Oct 2025 - Sep 2026). Replace with real saved logs later.
-export const cycleHistory: CycleRecord[] = [
-  { month: 'Oct', cycleLength: 28, periodLength: 5, fertileWindowLength: 5, symptoms: ['cramps', 'fatigue'], moods: ['good', 'okay'] },
-  { month: 'Nov', cycleLength: 29, periodLength: 4, fertileWindowLength: 5, symptoms: ['cramps', 'headache'], moods: ['great', 'good'] },
-  { month: 'Dec', cycleLength: 27, periodLength: 5, fertileWindowLength: 5, symptoms: ['bloating'], moods: ['okay', 'good'] },
-  { month: 'Jan', cycleLength: 28, periodLength: 5, fertileWindowLength: 5, symptoms: ['cramps', 'bloating'], moods: ['good', 'good'] },
-  { month: 'Feb', cycleLength: 29, periodLength: 4, fertileWindowLength: 5, symptoms: ['headache'], moods: ['great', 'okay'] },
-  { month: 'Mar', cycleLength: 28, periodLength: 5, fertileWindowLength: 5, symptoms: ['cramps'], moods: ['good', 'low'] },
-  { month: 'Apr', cycleLength: 27, periodLength: 4, fertileWindowLength: 5, symptoms: ['cramps', 'bloating'], moods: ['good', 'great'] },
-  { month: 'May', cycleLength: 29, periodLength: 5, fertileWindowLength: 5, symptoms: ['cramps', 'headache'], moods: ['okay', 'good'] },
-  { month: 'Jun', cycleLength: 28, periodLength: 4, fertileWindowLength: 5, symptoms: ['bloating'], moods: ['good', 'good'] },
-  { month: 'Jul', cycleLength: 28, periodLength: 5, fertileWindowLength: 5, symptoms: ['cramps', 'bloating'], moods: ['great', 'good'] },
-  { month: 'Aug', cycleLength: 30, periodLength: 4, fertileWindowLength: 5, symptoms: ['headache', 'cramps'], moods: ['okay', 'good'] },
-  { month: 'Sep', cycleLength: 28, periodLength: 5, fertileWindowLength: 5, symptoms: ['cramps', 'bloating'], moods: ['good', 'great'] },
-];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** One record per COMPLETED cycle in her confirmed history, oldest first. */
+export function buildCycleRecords(periods: PeriodLog[], dailyLogs: Record<string, DailyLog> = {}): CycleRecord[] {
+  return completedCycles(periods).map((c) => {
+    const log = periods.find((p) => p.start === c.start);
+    const logs = Object.values(dailyLogs).filter(
+      (d) => diffDays(d.date, c.start) >= 0 && diffDays(c.nextStart, d.date) > 0
+    );
+    return {
+      month: MONTHS[Number(c.start.slice(5, 7)) - 1],
+      cycleLength: c.length,
+      periodLength: log?.end ? diffDays(log.end, log.start) + 1 : null,
+      fertileWindowLength: 6,
+      symptoms: logs.flatMap((d) => d.symptoms ?? []),
+      moods: logs.flatMap((d) => (d.mood ? [d.mood] : [])),
+    };
+  });
+}

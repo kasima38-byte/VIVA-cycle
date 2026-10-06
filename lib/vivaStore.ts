@@ -152,6 +152,15 @@ export function setGoal(goal: Goal | null) {
   update({ goal });
 }
 
+/** Personal details. Never affect cycle calculations. */
+export function setName(name: string) {
+  update({ name: name.trim() });
+}
+
+export function setDateOfBirth(dateOfBirth: DateStr | null) {
+  update({ dateOfBirth });
+}
+
 /** For testing: wipe all saved data and return to the Welcome screen. */
 export async function resetVivaStore() {
   state = { ...EMPTY, loaded: true };
