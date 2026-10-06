@@ -58,7 +58,9 @@ export default function FertilityScreen() {
   let hero = { eyebrow: 'Your', heading: 'Estimated fertile window', body: 'Log a period to see estimates', dates: '–', detail: '' };
   if (est) {
     const w = est.upcomingFertileWindow;
-    const dates = range(w.start, w.end) + ' ' + w.end.slice(0, 4);
+    const dates = w.start.slice(5, 7) === w.end.slice(5, 7)
+      ? Number(w.start.slice(8)) + '–' + short(w.end)
+      : range(w.start, w.end);
     if (est.fertileWindowStatus === 'current') {
       const left = diffDays(w.end, today) + 1;
       hero = {
@@ -98,11 +100,9 @@ export default function FertilityScreen() {
       if (diffDays(periodEnd, date) >= 0) type = 'period';
       if (diffDays(date, fwStart) >= 0 && diffDays(fwEnd, date) >= 0) type = 'fertile';
       if (date === est.estimatedOvulation) type = 'ovulation';
-      if (date === today) {
-        type = 'today';
-        todayIdx = days.length;
-      }
-      days.push({ key: date, type });
+      const isToday = date === today;
+      if (isToday) todayIdx = days.length;
+      days.push({ key: date, type, isToday });
     }
     const brackets: { label: string; sublabel: string; color: string; startIndex: number; endIndex: number }[] = [];
     if (startCD <= est.periodLengthUsed) {

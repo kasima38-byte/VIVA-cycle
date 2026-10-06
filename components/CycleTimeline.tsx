@@ -4,6 +4,7 @@ import { colors, spacing } from '../constants/theme';
 export type TimelineDay = {
   key: string;
   type: 'period' | 'fertile' | 'ovulation' | 'today' | 'normal';
+  isToday?: boolean; // ring + label on top of the day's own colour
 };
 
 type Bracket = {
@@ -49,22 +50,25 @@ export default function CycleTimeline({ days, brackets }: Props) {
       </View>
 
       <View style={styles.dotsRow}>
-        {days.map((day) => (
-          <View key={day.key} style={styles.dotWrap}>
-            {day.type === 'today' && <View style={styles.todayRing} />}
-            <View style={[styles.dot, { backgroundColor: dotColor(day.type) }]} />
-          </View>
-        ))}
+        {days.map((day) => {
+          const today = day.isToday || day.type === 'today';
+          return (
+            <View key={day.key} style={styles.dotWrap}>
+              {today && <View style={styles.todayRing} />}
+              <View style={[styles.dot, { backgroundColor: dotColor(day.type) }]} />
+            </View>
+          );
+        })}
       </View>
 
       <View style={styles.todayLabelRow}>
-        {days.map((day) =>
-          day.type === 'today' ? (
-            <Text key={day.key + '-label'} style={styles.todayLabel}>
-              Today
-            </Text>
-          ) : null
-        )}
+        {days.map((day) => (
+          <View key={day.key + '-label'} style={styles.labelCell}>
+            {day.isToday || day.type === 'today' ? (
+              <Text style={styles.todayLabel}>Today</Text>
+            ) : null}
+          </View>
+        ))}
       </View>
     </View>
   );
@@ -93,30 +97,40 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  // Each day shares the row width equally, so 20+ days always fit the screen
   dotWrap: {
-    width: DOT,
+    flex: 1,
     height: DOT,
     alignItems: 'center',
     justifyContent: 'center',
   },
   dot: {
-    width: DOT - 4,
-    height: DOT - 4,
-    borderRadius: (DOT - 4) / 2,
+    width: '78%',
+    maxWidth: DOT - 4,
+    aspectRatio: 1,
+    borderRadius: DOT,
   },
   todayRing: {
     position: 'absolute',
-    width: DOT + 8,
-    height: DOT + 8,
-    borderRadius: (DOT + 8) / 2,
+    width: '100%',
+    maxWidth: DOT + 4,
+    aspectRatio: 1,
+    borderRadius: DOT,
     borderWidth: 1.5,
     borderColor: colors.magenta,
   },
   todayLabelRow: {
-    alignItems: 'center',
+    flexDirection: 'row',
     marginTop: 4,
   },
+  labelCell: {
+    flex: 1,
+    alignItems: 'center',
+    overflow: 'visible',
+  },
   todayLabel: {
+    width: 64, // wider than its cell; centred under the dot
+    textAlign: 'center',
     fontSize: 12.5,
     fontWeight: '600',
     color: colors.magenta,
