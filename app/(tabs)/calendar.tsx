@@ -97,6 +97,9 @@ export default function CalendarScreen() {
             ovulationDate={est ? est.estimatedOvulation : null}
             nextPeriod={est ? est.estimatedNextPeriod : null}
             onViewDetails={() => router.push('/fertility')}
+            onPressInsight={(id) => {
+              if (id === 'fertile') router.push('/fertility');
+            }}
           />
 
         </ScrollView>
