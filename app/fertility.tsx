@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import CycleMonthCard, { DayKind } from '../components/CycleMonthCard';
 import CycleRing from '../components/CycleRing';
 import SegmentedTabs from '../components/SegmentedTabs';
+import WhyItMattersCard from '../components/WhyItMattersCard';
 import { colors, spacing } from '../constants/theme';
 import { addDays, calculateCycle, CycleEstimate, diffDays } from '../lib/cycleEngine';
 import { useToday } from '../lib/useToday';
@@ -184,6 +185,9 @@ export default function FertilityScreen() {
               onViewCalendar={() => router.push('/(tabs)/calendar')}
             />
           ) : null}
+
+          {/* Section 3: why these days matter (educational) */}
+          <WhyItMattersCard onPress={() => setActiveTab('Tips')} />
         </ScrollView>
       </SafeAreaView>
     </View>
