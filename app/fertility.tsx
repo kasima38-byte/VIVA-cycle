@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import CycleMonthCard, { DayKind } from '../components/CycleMonthCard';
 import CycleRing from '../components/CycleRing';
 import SegmentedTabs from '../components/SegmentedTabs';
+import OvulationSignsCard from '../components/OvulationSignsCard';
 import WhyItMattersCard from '../components/WhyItMattersCard';
 import { colors, spacing } from '../constants/theme';
 import { addDays, calculateCycle, CycleEstimate, diffDays } from '../lib/cycleEngine';
@@ -188,6 +189,9 @@ export default function FertilityScreen() {
 
           {/* Section 3: why these days matter (educational) */}
           <WhyItMattersCard onPress={() => setActiveTab('Tips')} />
+
+          {/* Section 4: possible signs (educational; VIVA does not track or detect these) */}
+          <OvulationSignsCard onPress={() => setActiveTab('Signs')} />
         </ScrollView>
       </SafeAreaView>
     </View>
