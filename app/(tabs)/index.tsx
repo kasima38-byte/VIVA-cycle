@@ -61,10 +61,8 @@ export default function HomeScreen() {
             <OutlinedButton label="View calendar" onPress={() => router.push('/(tabs)/calendar')} />
           </View>
           
-          <Pressable
+          <View
             style={styles.nextPeriodCard}
-            onPress={() => router.push('/(tabs)/calendar')}
-            accessibilityRole="button"
             accessibilityLabel={summary.isLate ? 'Period may be late' : 'Next period in ' + summary.nextPeriodDays + (summary.nextPeriodDays === 1 ? ' day' : ' days')}
           >
             <View style={styles.nextPeriodIconCircle}>
@@ -81,8 +79,7 @@ export default function HomeScreen() {
               </Text>
               <Text style={styles.nextPeriodDetail}>{summary.nextPeriodText}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.magenta} />
-          </Pressable>
+          </View>
 
           <View style={styles.todayCard}>
             <View style={styles.todayIconCircle}>
