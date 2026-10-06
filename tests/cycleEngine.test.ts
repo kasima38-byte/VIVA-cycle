@@ -305,5 +305,95 @@ group('Ovulation = cycle day (cycle length − 14)');
   }
 }
 
+group('Prompt 6 · Example: logged 3 Oct, 28 days, 5-day period');
+{
+  const l = logs('2026-10-03');
+  const e = est(B(28, 5), l, '2026-10-10');
+  eq(e.estimatedOvulation, '2026-10-16', 'estimated ovulation 16 Oct (CD14, agreed rule)');
+  eq(e.estimatedFertileWindow, { start: '2026-10-11', end: '2026-10-16' }, 'estimated fertile window 11–16 Oct (6 days)');
+  eq(e.ovulationIsVariable, false, 'regular stated cycle → single date');
+  eq(e.fertileWindowStatus, 'upcoming', '10 Oct: window upcoming');
+  eq(est(B(28, 5), l, '2026-10-13').fertileWindowStatus, 'current', '13 Oct: window current');
+  const after = est(B(28, 5), l, '2026-10-20');
+  eq(after.fertileWindowStatus, 'passed', '20 Oct: window passed');
+  eq(after.estimatedOvulation, '2026-10-16', 'after the date it is still the SAME estimate (never converted to confirmed)');
+  eq(after.upcomingFertileWindow, { start: '2026-11-08', end: '2026-11-13' }, 'next estimated window 8–13 Nov');
+  const h = getHomeSummary(viva(B(28, 5), l), '2026-10-20');
+  const text = JSON.stringify(h).toLowerCase();
+  eq(/safe day|confirmed ovulation|ovulation occurred|cannot get pregnant|definitely/.test(text), false, 'no unsafe or certain wording on Home');
+}
+
+group('Prompt 6 · Variable cycle 27, 31, 28, 30');
+{
+  const l = logs('2026-06-01', '2026-06-28', '2026-07-29', '2026-08-26', '2026-09-25');
+  eq(completedCycles(l).map((c) => c.length), [27, 31, 28, 30], 'history read correctly');
+  const e = est(B(28, 5, 'regular'), l, '2026-10-01');
+  eq([e.lengthSource, e.cycleLengthUsed], ['history', 29], 'uses her average: 29 days');
+  eq(e.estimatedNextPeriod, '2026-10-24', 'next period 24 Oct');
+  eq(e.estimatedOvulation, '2026-10-09', 'estimated ovulation 9 Oct (CD15 = 29 − 14)');
+  eq(e.ovulationIsVariable, true, 'variation shown, even though she said "regular"');
+  eq(e.ovulationRange, { start: '2026-10-07', end: '2026-10-11' }, 'shown as around 7–11 Oct (±2 from her own variation)');
+  const h = getHomeSummary(viva(B(28, 5), l), '2026-10-01');
+  eq(h.ovulationText, 'Around 7 Oct – 11 Oct 2026', 'Home shows the range');
+  eq(h.confidenceNote.includes('range'), true, 'Home explains why it is a range');
+}
+
+group('Prompt 6 · Stated regularity without history');
+{
+  const l = logs('2026-10-03');
+  eq(est(B(28, 5, 'regular'), l, '2026-10-05').ovulationIsVariable, false, 'regular → single date');
+  const ir = est(B(28, 5, 'irregular'), l, '2026-10-05');
+  eq([ir.ovulationIsVariable, ir.ovulationRange.start, ir.ovulationRange.end], [true, '2026-10-09', '2026-10-23'], 'irregular → around 9–23 Oct (±7)');
+  eq(est(B(null, 5, 'not_sure'), l, '2026-10-05').ovulationIsVariable, true, '"Not sure" → range');
+  eq(ir.estimatedFertileWindow, { start: '2026-10-11', end: '2026-10-16' }, 'fertile window itself is not widened (no extra days added)');
+}
+
+group('Prompt 6 · Outlier cycle (28, 29, 27, 45, 28) — current behaviour, documented');
+{
+  const l = logs('2026-03-01', '2026-03-29', '2026-04-27', '2026-05-24', '2026-07-08', '2026-08-05');
+  const e = est(B(28, 5), l, '2026-08-10');
+  eq(e.cycleLengthUsed, 31, 'mean is pulled up to 31 by the single 45-day cycle (no outlier handling yet)');
+  eq(e.ovulationIsVariable, true, 'but the wide variation is flagged, so ovulation is shown as a range');
+}
+
+group('Prompt 6 · Goal change never changes dates');
+{
+  const l = logs('2026-10-03');
+  const a = getHomeSummary({ ...viva(B(28, 5), l), goal: 'conceive' }, '2026-10-13');
+  const b = getHomeSummary({ ...viva(B(28, 5), l), goal: 'avoid' }, '2026-10-13');
+  const c = getHomeSummary({ ...viva(B(28, 5), l), goal: 'understand' }, '2026-10-13');
+  const d = getHomeSummary({ ...viva(B(28, 5), l), goal: 'track' }, '2026-10-13');
+  const dates = (x: typeof a) => [x.cycleDay, x.fertileRange, x.ovulationText, x.nextPeriodText];
+  eq(dates(b), dates(a), 'conceive → avoid: identical dates');
+  eq(dates(c), dates(a), 'understand: identical dates');
+  eq(a.goalNote !== b.goalNote, true, 'guidance wording differs by goal');
+  eq((b.goalNote ?? '').includes('should not be your only method of contraception'), true, 'avoid: contraception caveat');
+  eq((a.goalNote ?? '').includes('never guaranteed'), true, 'conceive: no promise of pregnancy');
+  eq(d.goalNote, null, 'track: no conception/contraception emphasis');
+  eq(JSON.stringify(l), JSON.stringify(logs('2026-10-03')), 'confirmed periods untouched');
+}
+
+group('Prompt 6 · Avoid: caveat on every phase, never "safe"');
+{
+  const l = logs('2026-10-03');
+  for (const day of ['2026-10-04', '2026-10-08', '2026-10-13', '2026-10-20', '2026-10-29']) {
+    const g = getHomeSummary({ ...viva(B(28, 5), l), goal: 'avoid' }, day).goalNote ?? '';
+    eq(g.includes('only method of contraception') && !/safe/i.test(g), true, day + ': cautious, no "safe"');
+  }
+}
+
+group('Prompt 6 · New period re-anchors all fertility estimates');
+{
+  const before = est(B(28, 5), logs('2026-10-03'), '2026-10-06');
+  const r = applyPeriodLog(logs('2026-10-03'), '2026-10-06', '2026-10-06');
+  eq(r.result.kind, 'tooClose', 'logging 6 Oct three days after 3 Oct asks to correct it (Prompt 4 rule)');
+  const fixed = applyPeriodCorrection(logs('2026-10-03'), '2026-10-03', '2026-10-06', '2026-10-06').logs;
+  const after = est(B(28, 5), fixed, '2026-10-06');
+  eq([before.estimatedOvulation, after.estimatedOvulation], ['2026-10-16', '2026-10-19'], 'ovulation 16 Oct → 19 Oct');
+  eq(after.estimatedFertileWindow, { start: '2026-10-14', end: '2026-10-19' }, 'new window 14–19 Oct; no stale 16 Oct estimate');
+  const nextCycle = applyPeriodLog(logs('2026-09-05'), '2026-10-06', '2026-10-06').logs;
+  eq(est(B(28, 5), nextCycle, '2026-10-06').estimatedOvulation, '2026-10-19', 'late period (5 Sep → 6 Oct): ovulation recalculated from 6 Oct');
+}
+
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exitCode = failed === 0 ? 0 : 1;

@@ -172,19 +172,19 @@ export default function CycleInsightsSection({
   const ovulation = ovulationDate ? toDate(ovulationDate) : null;
   const next = nextPeriod ? toDate(nextPeriod) : null;
 
-  let fertileMessage = 'Log a period to see your fertile window.';
+  let fertileMessage = 'Log a period to see your estimated fertile window.';
   if (fwStart && fwEnd) {
     const toStart = daysBetween(now, fwStart);
     const toEnd = daysBetween(now, fwEnd);
-    if (toStart > 1) fertileMessage = `Your fertile window may start in ${toStart} days.`;
-    else if (toStart === 1) fertileMessage = 'Your fertile window may start tomorrow.';
-    else if (toEnd >= 0) fertileMessage = 'You’re currently in your fertile window.';
-    else fertileMessage = 'Your fertile window has passed for this cycle.';
+    if (toStart > 1) fertileMessage = `Your estimated fertile window may start in ${toStart} days.`;
+    else if (toStart === 1) fertileMessage = 'Your estimated fertile window may start tomorrow.';
+    else if (toEnd >= 0) fertileMessage = 'You may be in your estimated fertile window.';
+    else fertileMessage = 'This cycle’s estimated fertile window has passed.';
   }
 
   const candidates = [
     { id: 'period' as const, title: 'Period expected', date: next, icon: 'water' as IconName, iconColor: COLORS.pink, iconBg: COLORS.pinkSoft },
-    { id: 'fertileEnd' as const, title: 'Fertile window ends', date: fwEnd, icon: 'leaf' as IconName, iconColor: COLORS.pink, iconBg: COLORS.pinkSoft },
+    { id: 'fertileEnd' as const, title: 'Estimated fertile window ends', date: fwEnd, icon: 'leaf' as IconName, iconColor: COLORS.pink, iconBg: COLORS.pinkSoft },
     { id: 'ovulation' as const, title: 'Estimated ovulation', date: ovulation, icon: 'radio-button-on' as IconName, iconColor: COLORS.purple, iconBg: COLORS.lavenderSoft },
   ];
 
@@ -206,7 +206,7 @@ export default function CycleInsightsSection({
             iconBg={COLORS.lavenderSoft}
             cardBg={COLORS.lavenderHero}
             borderColor={COLORS.lavenderBorder}
-            title="Fertile window"
+            title="Estimated fertile window"
             value={fwStart && fwEnd ? formatRange(fwStart, fwEnd) : '–'}
             subtitle={fertileMessage}
             onPress={() => onPressInsight?.('fertile')}

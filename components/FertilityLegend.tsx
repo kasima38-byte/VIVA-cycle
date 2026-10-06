@@ -3,8 +3,8 @@ import { colors, spacing } from '../constants/theme';
 
 const items = [
   { label: 'Period', color: colors.magenta },
-  { label: 'Fertile window', color: colors.lightPurple },
-  { label: 'Ovulation', color: colors.ovulationPurple },
+  { label: 'Estimated fertile window', color: colors.lightPurple },
+  { label: 'Estimated ovulation', color: colors.ovulationPurple },
   { label: 'Other days', color: colors.border },
 ];
 

@@ -1,5 +1,5 @@
 import { formatLongDate } from './cycleData';
-import { calculateCycle, FertilityStatus, Goal, todayLocal } from '../lib/cycleEngine';
+import { calculateCycle, CycleEstimate, FertilityStatus, Goal, todayLocal } from '../lib/cycleEngine';
 import { VivaState } from '../lib/vivaStore';
 
 type LateCopy = { label: string; explanation: string; message: string };
@@ -27,26 +27,52 @@ function lateCopy(daysLate: number): LateCopy {
   };
 }
 
-// Extra guidance by goal. Estimates only: never "safe day", never a guarantee either way.
-function goalGuidance(goal: Goal | null, status: FertilityStatus): string | null {
-  const fertileNow = status === 'potentiallyFertile' || status === 'ovulationLikely';
-  const approaching = status === 'fertileApproaching';
+// Guidance by goal. Same dates for every goal — only the wording changes.
+// Estimates only: never "safe day", never "can't get pregnant", never a promise.
+const NOT_CONTRACEPTION =
+  'A calendar estimate should not be your only method of contraception.';
 
-  if (goal === 'conceive') {
-    if (fertileNow) return 'These days may offer a higher chance of conception. Having intercourse regularly in your fertile window may help.';
-    if (approaching) return 'Your estimated fertile window is approaching. An LH test can give extra information about ovulation.';
-    return null;
+function goalGuidance(goal: Goal | null, est: CycleEstimate): string | null {
+  const s = est.status;
+  const fw = est.fertileWindowStatus;
+  const window = shortDate(est.upcomingFertileWindow.start) + ' – ' + shortDate(est.upcomingFertileWindow.end);
+
+  switch (goal) {
+    case 'conceive':
+      if (fw === 'current')
+        return 'You may be in your estimated fertile window. Intercourse every 1–2 days in this window may help, but pregnancy is never guaranteed and ovulation can vary from cycle to cycle.';
+      if (fw === 'upcoming')
+        return 'Your estimated fertile window is ' + window + '. These are calendar-based estimates and may vary from cycle to cycle.';
+      return "This cycle's estimated fertile window has passed. Your next one is estimated around " + window + '.';
+
+    case 'avoid':
+      if (fw === 'current' || s === 'fertileApproaching')
+        return 'Pregnancy may be possible on these days. If you want to avoid pregnancy, use an effective contraceptive method or avoid vaginal intercourse. ' + NOT_CONTRACEPTION;
+      return 'Fertility is estimated to be lower, but pregnancy can still happen because ovulation timing varies. ' + NOT_CONTRACEPTION;
+
+    case 'understand':
+      switch (s) {
+        case 'menstruation':
+          return 'Your cycle begins on the first day of your period. After bleeding, the follicular phase prepares an egg for release.';
+        case 'fertileApproaching':
+        case 'potentiallyFertile':
+          return 'The fertile window is the few days before and including ovulation, because sperm can survive several days in the body.';
+        case 'ovulationLikely':
+          return 'Ovulation is when an egg is released; the egg survives for about a day. The date shown is a calendar estimate, not a measurement.';
+        case 'ovulationMayHavePassed':
+        case 'postOvulatory':
+          return 'After ovulation comes the luteal phase, usually about two weeks, which ends with your next period.';
+        case 'periodExpectedSoon':
+          return 'The luteal phase ends when your next period starts, beginning a new cycle.';
+        default:
+          return fw === 'upcoming'
+            ? 'You are likely in the follicular phase, when an egg matures. Your estimated fertile window comes next. Calendar dates cannot pinpoint these phases exactly.'
+            : 'Calendar dates give an estimate of your cycle phases; your body may vary.';
+      }
+
+    default: // 'track' or not set: focus on dates, no conception/contraception emphasis
+      return null;
   }
-  if (goal === 'avoid') {
-    if (fertileNow || approaching) {
-      return 'Pregnancy may be possible on these days. If you want to avoid pregnancy, use an effective contraceptive method or avoid vaginal intercourse. This estimate is not contraception.';
-    }
-    if (status === 'lowerFertility' || status === 'postOvulatory') {
-      return 'Fertility is estimated to be lower, but pregnancy can still happen because ovulation timing varies.';
-    }
-    return null;
-  }
-  return null;
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -79,7 +105,7 @@ const STATUS_COPY: Record<FertilityStatus | 'unknown', StatusCopy> = {
   },
   lowerFertility: {
     label: 'Lower estimated fertility',
-    explanation: 'Based on your cycle history, fertility is estimated to be lower right now. Pregnancy can still happen.',
+    explanation: 'Based on your cycle information, fertility is estimated to be lower right now. Pregnancy can still happen.',
     message: 'This is an estimate, not a guarantee.',
     note: null,
   },
@@ -92,24 +118,24 @@ const STATUS_COPY: Record<FertilityStatus | 'unknown', StatusCopy> = {
   potentiallyFertile: {
     label: 'Potentially fertile',
     explanation: 'You may be in your estimated fertile window. Pregnancy is possible on these days.',
-    message: 'This is an estimate based on your cycle history.',
+    message: 'This is an estimate based on your cycle information.',
     note: 'Potentially fertile',
   },
   ovulationLikely: {
-    label: 'Ovulation likely approaching',
-    explanation: 'Ovulation is estimated around now, but its timing varies and is not confirmed.',
+    label: 'Around estimated ovulation',
+    explanation: 'Your estimated ovulation is today or tomorrow. Its timing varies and VIVA cannot confirm it.',
     message: 'Pregnancy is possible on these days.',
     note: 'Estimated, not confirmed',
   },
   ovulationMayHavePassed: {
-    label: 'Ovulation may have occurred',
-    explanation: 'Your estimated ovulation date has just passed. This is an estimate, not a confirmed event.',
-    message: 'Pregnancy is still possible for a short time.',
+    label: 'Estimated ovulation has passed',
+    explanation: 'Your estimated ovulation date has just passed. VIVA cannot confirm whether or when ovulation happened.',
+    message: 'Pregnancy may still be possible for a short time.',
     note: null,
   },
   postOvulatory: {
-    label: 'Post-ovulatory phase',
-    explanation: 'This is after your estimated ovulation. Your body may be preparing for your next period.',
+    label: 'After estimated ovulation',
+    explanation: 'This is after your estimated ovulation. Your next period is estimated to follow.',
     message: 'Take care of yourself.',
     note: null,
   },
@@ -147,6 +173,9 @@ export function getHomeSummary(viva: VivaState, today: string = todayLocal()) {
       isLate: false,
       goal: viva.goal,
       goalNote: null,
+      ovulationIsVariable: false,
+      fertileWindowStatus: 'upcoming' as const,
+      regularity: viva.baseline.regularity,
       phaseExplanation: copy.explanation,
       todayMessage: copy.message,
       todayNote: copy.note,
@@ -173,6 +202,10 @@ export function getHomeSummary(viva: VivaState, today: string = todayLocal()) {
     confidenceNote = 'Your cycle lengths vary, so predicting ovulation from calendar dates alone is less reliable.';
   }
 
+  if (est.ovulationIsVariable) {
+    confidenceNote += ' Because your cycle length can vary, estimated ovulation is shown as a range.';
+  }
+
   return {
     hasData: true,
     cycleDay: est.currentCycleDay,
@@ -182,13 +215,18 @@ export function getHomeSummary(viva: VivaState, today: string = todayLocal()) {
     statusKey: est.status,
     fertileRange:
       shortDate(est.estimatedFertileWindow.start) + ' – ' + formatLongDate(est.estimatedFertileWindow.end),
-    ovulationText: formatLongDate(est.estimatedOvulation),
+    ovulationText: est.ovulationIsVariable
+      ? 'Around ' + shortDate(est.ovulationRange.start) + ' – ' + formatLongDate(est.ovulationRange.end)
+      : formatLongDate(est.estimatedOvulation),
+    ovulationIsVariable: est.ovulationIsVariable,
+    fertileWindowStatus: est.fertileWindowStatus,
+    regularity: est.regularity,
     nextPeriodDays: Math.max(0, est.daysToNextPeriod),
     nextPeriodText: 'Expected ' + formatLongDate(est.estimatedNextPeriod),
     periodLateDays: est.daysLate,
     isLate: est.isLate,
     goal: viva.goal,
-    goalNote: goalGuidance(viva.goal, est.status),
+    goalNote: goalGuidance(viva.goal, est),
     phaseExplanation: copy.explanation,
     todayMessage: copy.message,
     todayNote: copy.note,

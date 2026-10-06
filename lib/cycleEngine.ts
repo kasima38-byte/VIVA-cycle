@@ -73,6 +73,17 @@ export interface CycleEstimate {
   daysLate: number;
   confidence: 'low' | 'medium' | 'high';
   status: FertilityStatus;
+
+  // ---- Fertility estimate (Prompt 6). All values are calendar ESTIMATES. ----
+  regularity: Regularity;
+  /** Estimated ovulation ± the same margin as the next-period estimate */
+  ovulationRange: DateRange;
+  /** True when cycle variation is large enough that ovulation should be shown as a range */
+  ovulationIsVariable: boolean;
+  /** Where today sits relative to THIS cycle's estimated fertile window */
+  fertileWindowStatus: 'upcoming' | 'current' | 'passed';
+  /** This cycle's window if not yet passed, otherwise the next cycle's estimate */
+  upcomingFertileWindow: DateRange;
 }
 
 // ---------- Defaults & limits ----------
@@ -269,6 +280,25 @@ export function calculateCycle(
   else if (toOvulation < -2) status = 'postOvulatory';
   else status = 'lowerFertility';
 
+  // ---- Fertility estimate ----
+  // Ovulation is placed a fixed 15 days before the estimated next period, so
+  // its uncertainty is the SAME as the next-period uncertainty (margin):
+  //   history  → margin from her own cycle variation (SD, 1–7 days)
+  //   baseline → margin from her stated regularity
+  const ovulationRange: DateRange = {
+    start: addDays(estimatedOvulation, -margin),
+    end: addDays(estimatedOvulation, margin),
+  };
+  const statedRegular = lengthSource === 'baseline' && baseline.regularity === 'regular';
+  const ovulationIsVariable = margin > 1 && !statedRegular;
+
+  const fertileWindowStatus: CycleEstimate['fertileWindowStatus'] =
+    diffDays(fertileStart, today) > 0 ? 'upcoming' : diffDays(fertileEnd, today) >= 0 ? 'current' : 'passed';
+  const upcomingFertileWindow: DateRange =
+    fertileWindowStatus === 'passed'
+      ? { start: addDays(fertileStart, cycleLengthUsed), end: addDays(fertileEnd, cycleLengthUsed) }
+      : { start: fertileStart, end: fertileEnd };
+
   return {
     currentCycleStart,
     currentCycleDay,
@@ -285,6 +315,11 @@ export function calculateCycle(
     daysLate,
     confidence,
     status,
+    regularity: baseline.regularity,
+    ovulationRange,
+    ovulationIsVariable,
+    fertileWindowStatus,
+    upcomingFertileWindow,
   };
 }
 

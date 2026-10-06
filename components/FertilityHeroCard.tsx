@@ -5,18 +5,31 @@ import FertilityIllustration from './FertilityIllustration';
 
 type Props = {
   dateRange: string;
-  daysLeft: number;
+  daysLeft?: number;          // legacy
+  eyebrow?: string;
+  heading?: string;
+  body?: string;
+  detail?: string;            // line under the date range
   onLogSymptoms?: () => void;
 };
 
-export default function FertilityHeroCard({ dateRange, daysLeft, onLogSymptoms }: Props) {
+export default function FertilityHeroCard({
+  dateRange,
+  daysLeft,
+  eyebrow = 'Your',
+  heading = 'Estimated fertile window',
+  body = 'Calendar-based estimate',
+  detail,
+  onLogSymptoms,
+}: Props) {
+  const detailText = detail ?? (daysLeft !== undefined ? daysLeft + ' days left' : '');
   return (
     <View style={styles.card}>
       <View style={styles.topRow}>
         <View style={styles.leftCol}>
-          <Text style={styles.eyebrow}>You're in your</Text>
-          <Text style={styles.heading}>Fertile Window</Text>
-          <Text style={styles.body}>Higher chance of conception</Text>
+          <Text style={styles.eyebrow}>{eyebrow}</Text>
+          <Text style={styles.heading}>{heading}</Text>
+          <Text style={styles.body}>{body}</Text>
 
           <View style={styles.dateRow}>
             <View style={styles.calendarIcon}>
@@ -24,7 +37,7 @@ export default function FertilityHeroCard({ dateRange, daysLeft, onLogSymptoms }
             </View>
             <View>
               <Text style={styles.dateText}>{dateRange}</Text>
-              <Text style={styles.daysLeftText}>{daysLeft} days left</Text>
+              {detailText ? <Text style={styles.daysLeftText}>{detailText}</Text> : null}
             </View>
           </View>
 
@@ -36,7 +49,7 @@ export default function FertilityHeroCard({ dateRange, daysLeft, onLogSymptoms }
         <View style={styles.illustrationCol}>
           <View style={styles.speechBubble}>
             <Text style={styles.speechText}>
-              "Your body gives you signs. We help you understand them."
+              "These dates are calendar estimates. Your body may vary."
             </Text>
           </View>
           <FertilityIllustration />

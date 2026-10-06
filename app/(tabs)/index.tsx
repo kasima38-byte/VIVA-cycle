@@ -51,7 +51,7 @@ export default function HomeScreen() {
                 <Text style={styles.cycleHeadline}>{summary.phase}</Text>
                 <Text style={styles.nextPeriodDetail}>{summary.phaseExplanation}</Text>
 
-                <MiniIconRow icon="calendar" label="Fertile window" value={summary.fertileRange} />
+                <MiniIconRow icon="calendar" label="Estimated fertile window" value={summary.fertileRange} />
                 <MiniIconRow icon="radio-button-on" label="Estimated ovulation" value={summary.ovulationText} />
                                 <Text style={styles.nextPeriodDetail}>{summary.confidenceNote}</Text>
                                                 {summary.goalNote ? <Text style={styles.nextPeriodDetail}>{summary.goalNote}</Text> : null}
