@@ -108,10 +108,10 @@ export default function InsightsScreen() {
 
           <ChartCard
             title="Cycle Length"
-            subtitle={'Your last ' + records.length + ' cycles'}
+            subtitle={records.length ? 'Your last ' + records.length + (records.length === 1 ? ' cycle' : ' cycles') : 'Log your next period to complete a cycle'}
             data={cycleData}
-            averageText={cycleAvgText}
-            withinRange={isWithin(cycleAvg, CYCLE_RANGE)}
+            averageText={cycleAvg === null ? '–' : formatAverage(cycleAvg) + ' days'}
+            withinRange={cycleAvg === null ? null : isWithin(cycleAvg, CYCLE_RANGE)}
             rangeText="(21 - 35 days)"
             chartLabel="Cycle length chart"
           />
@@ -120,8 +120,8 @@ export default function InsightsScreen() {
             title="Period Length"
             subtitle={periodRecords.length ? 'Your last ' + periodRecords.length + ' periods' : 'Log when a period ends to see this'}
             data={periodData}
-            averageText={periodAvgText}
-            withinRange={isWithin(periodAvg, PERIOD_RANGE)}
+            averageText={periodAvg === null ? '–' : periodAvgText}
+            withinRange={periodAvg === null ? null : isWithin(periodAvg, PERIOD_RANGE)}
             rangeText="(2 - 7 days)"
             chartLabel="Period length chart"
           />

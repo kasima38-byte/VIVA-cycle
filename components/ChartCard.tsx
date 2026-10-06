@@ -8,7 +8,7 @@ type Props = {
   subtitle: string;
   data: BarDatum[];
   averageText: string;
-  withinRange: boolean;
+  withinRange: boolean | null; // null = no logged data yet: no range verdict
   rangeText: string;
   chartLabel: string;
   onSeeDetails?: () => void;
@@ -50,17 +50,21 @@ export default function ChartCard({
         <View style={styles.average} accessibilityLabel={`Average ${averageText}`}>
           <Text style={styles.averageLabel}>Average</Text>
           <Text style={styles.averageValue}>{averageText}</Text>
-          <View style={styles.statusRow}>
-            <View
-              style={[
-                styles.dot,
-                { backgroundColor: withinRange ? colors.fertilityGreen : colors.risingOrange },
-              ]}
-            />
-            <Text style={styles.statusText}>
-              {withinRange ? 'Within normal range' : 'Outside typical range'}
-            </Text>
-          </View>
+          {withinRange === null ? (
+            <Text style={styles.statusText}>No logged data yet</Text>
+          ) : (
+            <View style={styles.statusRow}>
+              <View
+                style={[
+                  styles.dot,
+                  { backgroundColor: withinRange ? colors.fertilityGreen : colors.risingOrange },
+                ]}
+              />
+              <Text style={styles.statusText}>
+                {withinRange ? 'Within typical range' : 'Outside typical range'}
+              </Text>
+            </View>
+          )}
           <Text style={styles.rangeText}>{rangeText}</Text>
         </View>
       </View>
