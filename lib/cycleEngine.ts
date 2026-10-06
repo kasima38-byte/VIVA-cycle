@@ -82,8 +82,10 @@ export interface CycleEstimate {
   ovulationIsVariable: boolean;
   /** Where today sits relative to THIS cycle's estimated fertile window */
   fertileWindowStatus: 'upcoming' | 'current' | 'passed';
-  /** This cycle's window if not yet passed, otherwise the next cycle's estimate */
-  upcomingFertileWindow: DateRange;
+  /** This cycle's window if not yet passed, otherwise the next cycle's estimate.
+   *  null while the period is LATE: the cycle is running long, so any later
+   *  window cannot be estimated (the Calendar also stops projecting). */
+  upcomingFertileWindow: DateRange | null;
 }
 
 // ---------- Defaults & limits ----------
@@ -162,11 +164,21 @@ function sortedStarts(logs: PeriodLog[], today: DateStr): DateStr[] {
   return unique.filter(d => diffDays(today, d) >= 0).sort(); // ignore future-dated logs
 }
 
+/** Cycle lengths outside 15–90 days are treated as logging gaps or mistakes. */
+export function isPlausibleCycleLength(len: number): boolean {
+  return len >= VALID_CYCLE.min && len <= VALID_CYCLE.max;
+}
+
+/** How much her cycle length varies (days, 1–7): the margin used for ranges. */
+export function cycleVariationMargin(lengths: number[]): number {
+  return Math.min(7, Math.max(1, Math.ceil(stdDev(lengths))));
+}
+
 function historyCycleLengths(starts: DateStr[]): number[] {
   const lengths: number[] = [];
   for (let i = 1; i < starts.length; i++) {
     const len = diffDays(starts[i], starts[i - 1]);
-    if (len >= VALID_CYCLE.min && len <= VALID_CYCLE.max) lengths.push(len);
+    if (isPlausibleCycleLength(len)) lengths.push(len);
   }
   return lengths.slice(-MAX_HISTORY_CYCLES);
 }
@@ -215,7 +227,7 @@ export function calculateCycle(
   if (cycleHist.length >= 2) {
     cycleLengthUsed = Math.round(mean(cycleHist));
     lengthSource = 'history';
-    margin = Math.min(7, Math.max(1, Math.ceil(stdDev(cycleHist))));
+    margin = cycleVariationMargin(cycleHist);
   } else if (baseline.cycleLength !== null) {
     cycleLengthUsed = baseline.cycleLength;
     lengthSource = 'baseline';
@@ -294,10 +306,12 @@ export function calculateCycle(
 
   const fertileWindowStatus: CycleEstimate['fertileWindowStatus'] =
     diffDays(fertileStart, today) > 0 ? 'upcoming' : diffDays(fertileEnd, today) >= 0 ? 'current' : 'passed';
-  const upcomingFertileWindow: DateRange =
-    fertileWindowStatus === 'passed'
-      ? { start: addDays(fertileStart, cycleLengthUsed), end: addDays(fertileEnd, cycleLengthUsed) }
-      : { start: fertileStart, end: fertileEnd };
+  const upcomingFertileWindow: DateRange | null =
+    fertileWindowStatus !== 'passed'
+      ? { start: fertileStart, end: fertileEnd }
+      : isLate
+      ? null
+      : { start: addDays(fertileStart, cycleLengthUsed), end: addDays(fertileEnd, cycleLengthUsed) };
 
   return {
     currentCycleStart,
@@ -414,6 +428,15 @@ export function applyPeriodLog(
   const i = next.findIndex(l => l.start === date);
   const completedCycle = i > 0 ? diffDays(date, next[i - 1].start) : null;
   return { result: { kind: 'added', completedCycle }, logs: next };
+}
+
+/** Delete a logged period. The only remaining period can't be deleted (edit its date instead). */
+export function applyPeriodRemoval(
+  logs: PeriodLog[], start: DateStr
+): { result: { kind: 'removed' } | { kind: 'notFound' } | { kind: 'lastOne' }; logs: PeriodLog[] } {
+  if (!logs.some(l => l.start === start)) return { result: { kind: 'notFound' }, logs };
+  if (logs.length <= 1) return { result: { kind: 'lastOne' }, logs };
+  return { result: { kind: 'removed' }, logs: logs.filter(l => l.start !== start) };
 }
 
 /** Correct a wrongly entered start: the old date is removed, the new one takes its place. */

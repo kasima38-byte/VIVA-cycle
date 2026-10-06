@@ -66,6 +66,7 @@ export default function PeriodLogScreen() {
             (r.daysApart === 1 ? ' day' : ' days') + ' apart. If that date was wrong, you can replace it.',
           [
             { text: 'Cancel', style: 'cancel' },
+            { text: 'Open period history', onPress: () => router.push('/period-history') },
             {
               text: 'Replace ' + formatLongDate(r.existing),
               onPress: () => {

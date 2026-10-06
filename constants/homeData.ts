@@ -35,7 +35,24 @@ const NOT_CONTRACEPTION =
 function goalGuidance(goal: Goal | null, est: CycleEstimate): string | null {
   const s = est.status;
   const fw = est.fertileWindowStatus;
-  const window = shortDate(est.upcomingFertileWindow.start) + ' – ' + shortDate(est.upcomingFertileWindow.end);
+
+  // Period LATE: the cycle is running longer than estimated, so ovulation may
+  // not have happened yet. Never call this lower fertility; give no window.
+  if (est.isLate) {
+    switch (goal) {
+      case 'conceive':
+        return 'Your period is later than expected, so ovulation timing in this cycle is uncertain. If you could be pregnant, a pregnancy test can help.';
+      case 'avoid':
+        return 'Your period is later than expected. When a cycle runs long, ovulation may happen later than estimated, so pregnancy may still be possible. ' + NOT_CONTRACEPTION;
+      case 'understand':
+        return 'A late period can simply mean a longer cycle this time; ovulation may have happened later than the estimate. Calendar dates cannot tell which.';
+      default:
+        return null;
+    }
+  }
+
+  const up = est.upcomingFertileWindow ?? est.estimatedFertileWindow; // never null when not late
+  const window = shortDate(up.start) + ' – ' + shortDate(up.end);
 
   switch (goal) {
     case 'conceive':

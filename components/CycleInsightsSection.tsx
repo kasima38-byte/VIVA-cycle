@@ -219,7 +219,7 @@ export default function CycleInsightsSection({
             borderColor={COLORS.pinkBorder}
             title="Typical cycle length"
             value={`${cycleLength} days`}
-            subtitle="Your average cycle length"
+            subtitle="Used for your predictions"
             onPress={() => onPressInsight?.('cycleLength')}
           />
           <InsightCard
@@ -230,7 +230,7 @@ export default function CycleInsightsSection({
             borderColor={COLORS.pinkBorder}
             title="Typical period length"
             value={`${periodLength} days`}
-            subtitle="Your average period length"
+            subtitle="Used for your predictions"
             onPress={() => onPressInsight?.('periodLength')}
           />
           <InsightCard

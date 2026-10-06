@@ -1,30 +1,19 @@
 import { useSyncExternalStore } from 'react';
+import { DailyLog, saveDailyLog as saveDailyLogToStore } from '../lib/vivaStore';
 
-// Daily logs and sexual activity only.
-// Periods, setup answers and settings live in lib/vivaStore.ts (the single
-// source of truth); predictions come from lib/cycleEngine.ts and are never stored.
+// Daily Tracking entries are SAVED in lib/vivaStore.ts (they survive restarts).
+// Sexual activity is not an approved VIVA feature: it stays in memory only.
 
-export type DailyLog = {
-  date: string;
-  mood?: string;
-  energy?: number;
-  symptoms?: string[];
-};
+export type { DailyLog };
 
 export type SexualActivityEntry = {
   date: string;
   hadActivity: boolean;
 };
 
-export type CycleLog = {
-  dailyLogs: Record<string, DailyLog>;
-  sexualActivity: SexualActivityEntry[];
-};
+type SexLog = { sexualActivity: SexualActivityEntry[] };
 
-let state: CycleLog = {
-  dailyLogs: {},
-  sexualActivity: [],
-};
+let state: SexLog = { sexualActivity: [] };
 
 const listeners = new Set<() => void>();
 
@@ -39,21 +28,16 @@ function subscribe(listener: () => void) {
   };
 }
 
-export function getCycleLog(): CycleLog {
+export function getCycleLog(): SexLog {
   return state;
 }
 
-export function useCycleLog(): CycleLog {
+export function useCycleLog(): SexLog {
   return useSyncExternalStore(subscribe, getCycleLog);
 }
 
 export function saveDailyLog(date: string, patch: Partial<DailyLog>) {
-  const existing = state.dailyLogs[date] || { date };
-  state = {
-    ...state,
-    dailyLogs: { ...state.dailyLogs, [date]: { ...existing, ...patch } },
-  };
-  notify();
+  saveDailyLogToStore(date, patch);
 }
 
 export function saveSexualActivity(date: string, hadActivity: boolean) {

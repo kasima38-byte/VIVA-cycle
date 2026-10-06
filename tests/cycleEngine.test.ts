@@ -2,13 +2,14 @@
 // Run with:  npx tsx tests/cycleEngine.test.ts
 // Other time zones:  TZ=Africa/Kampala npx tsx tests/cycleEngine.test.ts
 import {
-  addDays, applyPeriodCorrection, applyPeriodLog, calculateCycle, completedCycles, cycleDayOn,
+  addDays, applyPeriodCorrection, applyPeriodLog, applyPeriodRemoval, calculateCycle, completedCycles, cycleDayOn,
   CycleBaseline, diffDays, PeriodLog, Regularity,
 } from '../lib/cycleEngine';
 import { buildCalendarMonth } from '../constants/calendarModel';
 import { dateToKey, isValidDateKey, keyToLocalDate } from '../constants/dateUtils';
 import { getHomeSummary } from '../constants/homeData';
 import { buildCycleRecords } from '../constants/insightsData';
+import { calculateCycleRegularity } from '../constants/insightsCalc';
 import { getProfileStats } from '../constants/profileData';
 import type { VivaState } from '../lib/vivaStore';
 
@@ -35,8 +36,8 @@ const B = (cycleLength: number | null, periodLength: number | null, regularity: 
 const logs = (...starts: string[]): PeriodLog[] => starts.map((start) => ({ start }));
 const est = (b: CycleBaseline, l: PeriodLog[], today: string) => calculateCycle(b, l, today)!;
 const viva = (b: CycleBaseline, l: PeriodLog[]): VivaState => ({
-  loaded: true, version: 1, setupComplete: true, name: 'Sarah', dateOfBirth: null,
-  baseline: b, goal: 'conceive', periods: l,
+  loaded: true, loadError: false, version: 1, setupComplete: true, name: 'Sarah', dateOfBirth: null,
+  baseline: b, goal: 'conceive', periods: l, dailyLogs: {},
 });
 const marked = (year: number, month: number, l: PeriodLog[], e: ReturnType<typeof est>, today: string,
   key: 'isPeriod' | 'isPredictedPeriod' | 'isFertile' | 'isOvulation' | 'isToday') =>
@@ -472,6 +473,49 @@ group('Prompt 7 · Unknown baseline, then known (section 8, 20, 22)');
   const known = est(B(31, 5, 'regular'), l, '2026-10-10');
   eq([known.lengthSource, known.estimatedNextPeriod], ['baseline', '2026-11-06'], 'later entered 31 → used, next 6 Nov');
   eq(buildCycleRecords(l).length, 0, 'no fake historical cycles from onboarding LMP alone');
+}
+
+group('Prompt 8 fixes · Late period (M1, M2)');
+{
+  const l = logs('2026-10-03');
+  const e = est(B(28, 5), l, '2026-11-10');
+  eq([e.isLate, e.upcomingFertileWindow], [true, null], 'late: no next-window estimate (matches the Calendar)');
+  const cal = buildCalendarMonth(2026, 10, l, e, [], '2026-11-10').filter((c) => c.isCurrentMonth && c.isFertile).length;
+  eq(cal, 0, 'Calendar also shows no November window');
+  const avoid = getHomeSummary({ ...viva(B(28, 5), l), goal: 'avoid' }, '2026-11-10').goalNote ?? '';
+  eq([/lower/i.test(avoid), avoid.includes('pregnancy may still be possible'), avoid.includes('only method of contraception')], [false, true, true], 'avoid + late: never "lower", says pregnancy may be possible');
+  const conceive = getHomeSummary({ ...viva(B(28, 5), l), goal: 'conceive' }, '2026-11-10').goalNote ?? '';
+  eq([/\d+ (Nov|Dec)/.test(conceive), conceive.includes('uncertain')], [false, true], 'conceive + late: no window date, timing uncertain');
+  eq(est(B(28, 5), l, '2026-10-20').upcomingFertileWindow, { start: '2026-11-08', end: '2026-11-13' }, 'not late: next window still shown');
+}
+
+group('Prompt 8 fixes · Insights uses the engine rules (M5, M6)');
+{
+  const gap = logs('2026-01-01', '2026-01-29', '2026-05-09', '2026-06-06');
+  eq(buildCycleRecords(gap).map((r) => r.cycleLength), [28, 28], '100-day logging gap left out (engine rule 15–90)');
+  const v = logs('2026-03-01', '2026-03-28', '2026-04-28', '2026-05-26', '2026-06-25', '2026-07-21');
+  const ev = est(B(28, 5), v, '2026-07-25');
+  eq([ev.ovulationIsVariable, calculateCycleRegularity(buildCycleRecords(v)).label], [true, 'Somewhat irregular'], '27/31/28/30/26: Insights no longer says "regular" while Home shows a range');
+  const r = logs('2026-03-01', '2026-03-29', '2026-04-26', '2026-05-24');
+  eq([est(B(28, 5), r, '2026-05-30').ovulationIsVariable, calculateCycleRegularity(buildCycleRecords(r)).label], [false, 'Regular'], '28/28/28: both say regular');
+}
+
+group('Period history · edit and delete (M3)');
+{
+  const h = logs('2026-09-05', '2026-10-06', '2026-11-04');
+  const moved = applyPeriodCorrection(h, '2026-10-06', '2026-10-25', '2026-11-10');
+  eq(moved.result, { kind: 'tooClose', existing: '2026-11-04', daysApart: 10 }, 'editing 6 Oct → 25 Oct is refused (too close to 4 Nov); nothing replaced');
+  eq(moved.logs.map((l) => l.start), ['2026-09-05', '2026-10-06', '2026-11-04'], 'history untouched after a refused edit');
+  const ok = applyPeriodCorrection(h, '2026-10-06', '2026-10-09', '2026-11-10');
+  eq([ok.result.kind, ok.logs.map((l) => l.start)], ['replaced', ['2026-09-05', '2026-10-09', '2026-11-04']], 'edit 6 Oct → 9 Oct');
+  eq(completedCycles(ok.logs).map((c) => c.length), [34, 26], 'cycle lengths follow the edit');
+  const del = applyPeriodRemoval(h, '2026-10-06');
+  eq([del.result.kind, del.logs.map((l) => l.start)], ['removed', ['2026-09-05', '2026-11-04']], 'delete 6 Oct; others untouched');
+  eq(est(B(28, 5), del.logs, '2026-11-10').currentCycleStart, '2026-11-04', 'current cycle unchanged after deleting an old one');
+  const delLatest = applyPeriodRemoval(h, '2026-11-04');
+  eq(est(B(28, 5), delLatest.logs, '2026-11-10').currentCycleStart, '2026-10-06', 'deleting the latest re-anchors to the previous one');
+  eq(applyPeriodRemoval(logs('2026-10-06'), '2026-10-06').result.kind, 'lastOne', 'the only period cannot be deleted');
+  eq(applyPeriodRemoval(h, '2026-12-01').result.kind, 'notFound', 'unknown date: nothing happens');
 }
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');

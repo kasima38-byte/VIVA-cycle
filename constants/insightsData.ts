@@ -1,5 +1,5 @@
-import { completedCycles, diffDays, PeriodLog } from '../lib/cycleEngine';
-import { DailyLog } from './cycleStore';
+import { completedCycles, diffDays, isPlausibleCycleLength, PeriodLog } from '../lib/cycleEngine';
+import type { DailyLog } from '../lib/vivaStore';
 
 export type CycleRecord = {
   month: string;                 // month the cycle started
@@ -12,9 +12,10 @@ export type CycleRecord = {
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-/** One record per COMPLETED cycle in her confirmed history, oldest first. */
+/** One record per COMPLETED cycle in her confirmed history, oldest first.
+ *  Uses the engine's rule: gaps outside 15–90 days (e.g. a forgotten log) are left out. */
 export function buildCycleRecords(periods: PeriodLog[], dailyLogs: Record<string, DailyLog> = {}): CycleRecord[] {
-  return completedCycles(periods).map((c) => {
+  return completedCycles(periods).filter((c) => isPlausibleCycleLength(c.length)).map((c) => {
     const log = periods.find((p) => p.start === c.start);
     const logs = Object.values(dailyLogs).filter(
       (d) => diffDays(d.date, c.start) >= 0 && diffDays(c.nextStart, d.date) > 0

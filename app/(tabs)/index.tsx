@@ -65,7 +65,7 @@ export default function HomeScreen() {
             style={styles.nextPeriodCard}
             onPress={() => router.push('/(tabs)/calendar')}
             accessibilityRole="button"
-            accessibilityLabel={summary.isLate ? 'Period may be late' : 'Next period in ' + summary.nextPeriodDays + ' days'}
+            accessibilityLabel={summary.isLate ? 'Period may be late' : 'Next period in ' + summary.nextPeriodDays + (summary.nextPeriodDays === 1 ? ' day' : ' days')}
           >
             <View style={styles.nextPeriodIconCircle}>
               <Ionicons name="calendar" size={20} color={colors.magenta} />
@@ -74,8 +74,10 @@ export default function HomeScreen() {
               <Text style={styles.nextPeriodLabel}>Next period</Text>
               <Text style={styles.nextPeriodValue}>
                 {summary.isLate
-                  ? 'About ' + summary.periodLateDays + ' days late'
-                  : 'In ' + summary.nextPeriodDays + ' days'}
+                  ? 'About ' + summary.periodLateDays + (summary.periodLateDays === 1 ? ' day late' : ' days late')
+                  : summary.nextPeriodDays === 0
+                  ? 'Today'
+                  : 'In ' + summary.nextPeriodDays + (summary.nextPeriodDays === 1 ? ' day' : ' days')}
               </Text>
               <Text style={styles.nextPeriodDetail}>{summary.nextPeriodText}</Text>
             </View>

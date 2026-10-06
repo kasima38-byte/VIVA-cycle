@@ -6,7 +6,6 @@ import ChartCard from '../../components/ChartCard';
 import InsightSummaryCard from '../../components/InsightSummaryCard';
 import SegmentedTabs from '../../components/SegmentedTabs';
 import TipCard from '../../components/TipCard';
-import { useCycleLog } from '../../constants/cycleStore';
 import { buildCycleRecords } from '../../constants/insightsData';
 import { calculateCycle } from '../../lib/cycleEngine';
 import { useToday } from '../../lib/useToday';
@@ -39,7 +38,7 @@ export default function InsightsScreen() {
   const range = RANGE_LABELS[rangeLabel];
 
   const viva = useVivaStore();
-  const { dailyLogs } = useCycleLog();
+  const dailyLogs = viva.dailyLogs;
   const today = useToday();
   // Observed history only: completed cycles between her logged periods
   const all = useMemo(() => buildCycleRecords(viva.periods, dailyLogs), [viva.periods, dailyLogs]);

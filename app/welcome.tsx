@@ -55,7 +55,8 @@ const formatDate = (s: DateStr) =>
 
 const CYCLE_OPTIONS: (number | null)[] = [null, ...Array.from({ length: 25 }, (_, i) => 21 + i)]; // 21–45
 const PERIOD_OPTIONS: (number | null)[] = [null, ...Array.from({ length: 9 }, (_, i) => 2 + i)];  // 2–10
-const daysLabel = (n: number | null) => (n === null ? 'Not sure' : `${n} days`);
+// undefined = not chosen yet; null = she chose "Not sure"
+const daysLabel = (n: number | null | undefined) => (n === undefined ? 'Select' : n === null ? 'Not sure' : `${n} days`);
 
 const REGULARITY: { value: Regularity; label: string }[] = [
   { value: 'regular', label: 'Regular' },
@@ -91,9 +92,10 @@ export default function WelcomeSetupScreen({
   const [name, setName] = useState('');
   const [dob, setDob] = useState<DateStr | null>(null);
   const [lmp, setLmp] = useState<DateStr | null>(null);
-  const [cycleLength, setCycleLength] = useState<number | null>(28);
-  const [periodLength, setPeriodLength] = useState<number | null>(5);
-  const [regularity, setRegularity] = useState<Regularity>('regular');
+  // Nothing pre-selected: an untouched field must never become her "known" value
+  const [cycleLength, setCycleLength] = useState<number | null | undefined>(undefined);
+  const [periodLength, setPeriodLength] = useState<number | null | undefined>(undefined);
+  const [regularity, setRegularity] = useState<Regularity | null>(null);
   const [goal, setGoal] = useState<Goal | null>(null);
 
   const [pickerFor, setPickerFor] = useState<DateTarget | null>(null);
@@ -131,16 +133,23 @@ export default function WelcomeSetupScreen({
   };
 
   const handleContinue = () => {
-    const baseline: CycleBaseline = { cycleLength, periodLength, regularity };
+    const baseline: CycleBaseline = {
+      cycleLength: cycleLength ?? null,
+      periodLength: periodLength ?? null,
+      regularity: regularity ?? 'not_sure',
+    };
     const problems = lmp
       ? validateSetup({ name, baseline, goal: goal ?? 'track' }, lmp)
       : [
           ...(name.trim() ? [] : ['Please enter your name.']),
           'Please select when your last period started.',
         ];
+    if (cycleLength === undefined) problems.push('Please choose your usual cycle length (or "Not sure").');
+    if (periodLength === undefined) problems.push('Please choose your usual period duration (or "Not sure").');
+    if (regularity === null) problems.push('Please choose how regular your cycle is (or "Not sure").');
     if (!goal) problems.push('Please choose your goal.');
 
-    if (problems.length > 0 || !lmp || !goal) {
+    if (problems.length > 0 || !lmp || !goal || cycleLength === undefined || periodLength === undefined || regularity === null) {
       setErrors(problems);
       return;
     }

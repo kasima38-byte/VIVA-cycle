@@ -1,3 +1,4 @@
+import { cycleVariationMargin } from '../lib/cycleEngine';
 import { CycleRecord } from './insightsData';
 
 export type RangeKey = 'cycle' | '3m' | '6m' | '12m';
@@ -26,11 +27,10 @@ export function isWithin(value: number | null, range: { min: number; max: number
   return value !== null && value >= range.min && value <= range.max;
 }
 
+/** Same measure the engine uses for its prediction ranges (±days). */
 export function calculateVariation(records: CycleRecord[]): number | null {
   if (records.length < 2) return null;
-  const lengths = records.map((r) => r.cycleLength);
-  const avg = average(lengths) as number;
-  return Math.round(Math.max(...lengths.map((l) => Math.abs(l - avg))));
+  return cycleVariationMargin(records.map((r) => r.cycleLength));
 }
 
 export function calculateCycleRegularity(records: CycleRecord[]): {
@@ -39,8 +39,9 @@ export function calculateCycleRegularity(records: CycleRecord[]): {
 } {
   const variation = calculateVariation(records);
   if (variation === null) return { label: 'Not enough data', variation };
-  if (variation <= 3) return { label: 'Regular', variation };
-  if (variation <= 7) return { label: 'Somewhat irregular', variation };
+  // Matches Home: ±1 day → single-date estimates; more → shown as a range
+  if (variation <= 1) return { label: 'Regular', variation };
+  if (variation <= 4) return { label: 'Somewhat irregular', variation };
   return { label: 'Irregular', variation };
 }
 

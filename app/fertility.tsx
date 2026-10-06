@@ -56,7 +56,16 @@ export default function FertilityScreen() {
 
   // Hero card text
   let hero = { eyebrow: 'Your', heading: 'Estimated fertile window', body: 'Log a period to see estimates', dates: '–', detail: '' };
-  if (est) {
+  if (est && !est.upcomingFertileWindow) {
+    // Period is late: no window can be estimated until she logs her period
+    hero = {
+      eyebrow: 'This cycle',
+      heading: 'Estimated fertile window',
+      body: 'Your period is late, so timing is uncertain',
+      dates: 'Not available',
+      detail: 'Log your period to see new estimates',
+    };
+  } else if (est && est.upcomingFertileWindow) {
     const w = est.upcomingFertileWindow;
     const dates = w.start.slice(5, 7) === w.end.slice(5, 7)
       ? Number(w.start.slice(8)) + '–' + short(w.end)

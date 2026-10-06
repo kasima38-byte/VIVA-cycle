@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DailyHeroCard from '../components/DailyHeroCard';
 import DateSelector, { DateItem } from '../components/DateSelector';
@@ -10,34 +10,46 @@ import MoodSelector, { MoodValue } from '../components/MoodSelector';
 import TrackingCard from '../components/TrackingCard';
 import { colors, radius, spacing } from '../constants/theme';
 import { dateToKey, getToday, keyToLocalDate } from '../constants/dateUtils';
-import { saveDailyLog } from '../constants/cycleStore';
+import { saveDailyLog, useVivaStore } from '../lib/vivaStore';
 
 const WEEKDAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-function buildWeek(centerDate: Date, dotDays: number[]): DateItem[] {
+// A dot marks a day that has saved Daily Tracking data
+function buildWeek(centerDate: Date, loggedDates: Set<string>): DateItem[] {
   const start = new Date(centerDate);
   start.setDate(start.getDate() - 3);
   const items: DateItem[] = [];
   for (let i = 0; i < 7; i++) {
     const d = new Date(start);
     d.setDate(start.getDate() + i);
+    const key = dateToKey(d);
     items.push({
-      key: dateToKey(d),
+      key,
       weekday: WEEKDAY_NAMES[d.getDay()],
       day: d.getDate(),
-      hasDot: dotDays.includes(d.getDate()),
+      hasDot: loggedDates.has(key),
     });
   }
   return items;
 }
 
 export default function DailyTrackingScreen() {
+  const { dailyLogs } = useVivaStore();
   const [centerDate, setCenterDate] = useState(keyToLocalDate(getToday()));
-  const dates = useMemo(() => buildWeek(centerDate, [15, 16, 18]), [centerDate]);
+  const loggedDates = useMemo(() => new Set(Object.keys(dailyLogs)), [dailyLogs]);
+  const dates = useMemo(() => buildWeek(centerDate, loggedDates), [centerDate, loggedDates]);
   const [selectedKey, setSelectedKey] = useState(dateToKey(centerDate));
 
   const [mood, setMood] = useState<MoodValue>('good');
   const [energy, setEnergy] = useState(50);
+
+  // Show what she already saved for the selected day (or the defaults)
+  useEffect(() => {
+    const saved = dailyLogs[selectedKey];
+    setMood((saved?.mood as MoodValue) ?? 'good');
+    setEnergy(saved?.energy ?? 50);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedKey]);
 
   const goPrevWeek = () => {
     const d = new Date(centerDate);
@@ -70,6 +82,10 @@ export default function DailyTrackingScreen() {
   ];
 
   const handleSave = () => {
+    if (selectedKey > getToday()) {
+      Alert.alert('That day is in the future', 'You can only save tracking for today or earlier.');
+      return;
+    }
     saveDailyLog(selectedKey, { mood, energy });
     router.back();
   };
