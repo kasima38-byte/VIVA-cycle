@@ -8,7 +8,6 @@ import CycleCalendar from '../../components/CycleCalendar';
 import CycleInsightsSection from '../../components/CycleInsightsSection';
 import MonthSelector from '../../components/MonthSelector';
 import SettingsRow from '../../components/SettingsRow';
-import TipCard from '../../components/TipCard';
 import { monthLabel } from '../../constants/cycleData';
 import { buildCalendarMonth } from '../../constants/calendarModel';
 import { colors, spacing } from '../../constants/theme';
@@ -100,10 +99,6 @@ export default function CalendarScreen() {
             onViewDetails={() => router.push('/fertility')}
           />
 
-          <TipCard
-            title="Tip of the day"
-            body="Stay hydrated and get enough sleep for a healthier cycle."
-          />
         </ScrollView>
       </SafeAreaView>
     </View>

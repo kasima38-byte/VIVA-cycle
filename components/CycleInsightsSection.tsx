@@ -247,29 +247,6 @@ export default function CycleInsightsSection({
         </View>
       </View>
 
-      {/* ── Upcoming ── */}
-      <View style={styles.section}>
-        <SectionHeader title="Upcoming" action="See All" onPress={onSeeAll} />
-        <View style={styles.listTight}>
-          {upcoming.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Text style={styles.upcomingSubtitle}>Log a period to see what’s coming up.</Text>
-            </View>
-          ) : (
-            upcoming.map((e) => (
-              <UpcomingCard
-                key={e.id}
-                icon={e.icon}
-                iconColor={e.iconColor}
-                iconBg={e.iconBg}
-                title={e.title}
-                subtitle={`${formatRelative(e.days)}  (${formatLong(e.date)})`}
-                onPress={() => onPressUpcoming?.(e.id)}
-              />
-            ))
-          )}
-        </View>
-      </View>
     </View>
   );
 }
