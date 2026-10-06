@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ConfirmOvulationCard from '../components/ConfirmOvulationCard';
 import CycleMonthCard, { DayKind } from '../components/CycleMonthCard';
 import CycleRing from '../components/CycleRing';
 import SegmentedTabs from '../components/SegmentedTabs';
@@ -196,6 +197,9 @@ export default function FertilityScreen() {
 
           {/* Section 5: practical, goal-labelled guidance */}
           <TryingToConceiveCard onLearnMore={() => router.push('/conception-guide')} />
+
+          {/* Section 6: calendar estimate vs. evidence about ovulation */}
+          <ConfirmOvulationCard onLearnHow={() => router.push('/ovulation-tracking-guide')} />
         </ScrollView>
       </SafeAreaView>
     </View>
