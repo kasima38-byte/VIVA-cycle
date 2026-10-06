@@ -72,14 +72,16 @@ type Props = {
 };
 
 // ─── Small building blocks ──────────────────────────────────────────
-function SectionHeader({ title, action, onPress }: { title: string; action: string; onPress?: () => void }) {
+function SectionHeader({ title, action, onPress }: { title: string; action?: string; onPress?: () => void }) {
   return (
     <View style={styles.sectionHeader}>
       <Text style={styles.sectionTitle}>{title}</Text>
-      <Pressable onPress={onPress} hitSlop={10} accessibilityRole="button" style={styles.sectionAction}>
-        <Text style={styles.sectionActionText}>{action}</Text>
-        <Ionicons name="chevron-forward" size={18} color={COLORS.pink} />
-      </Pressable>
+      {action ? (
+        <Pressable onPress={onPress} hitSlop={10} accessibilityRole="button" style={styles.sectionAction}>
+          <Text style={styles.sectionActionText}>{action}</Text>
+          <Ionicons name="chevron-forward" size={18} color={COLORS.pink} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -101,7 +103,8 @@ function InsightCard({ icon, iconColor, iconBg, cardBg, borderColor, title, valu
   return (
     <Pressable
       onPress={onPress}
-      accessibilityRole="button"
+      disabled={!onPress}
+      accessibilityRole={onPress ? 'button' : 'text'}
       accessibilityLabel={`${title}, ${value}. ${subtitle}`}
       style={({ pressed }) => [
         styles.insightCard,
@@ -118,7 +121,7 @@ function InsightCard({ icon, iconColor, iconBg, cardBg, borderColor, title, valu
         <Text style={[styles.insightValue, hero && styles.heroValue]}>{value}</Text>
         <Text style={styles.insightSubtitle}>{subtitle}</Text>
       </View>
-      <Ionicons name="chevron-forward" size={24} color={COLORS.navy} />
+      {onPress ? <Ionicons name="chevron-forward" size={24} color={COLORS.navy} /> : null}
     </Pressable>
   );
 }
@@ -197,7 +200,7 @@ export default function CycleInsightsSection({
     <View style={styles.container}>
       {/* ── Cycle Insights ── */}
       <View style={styles.section}>
-        <SectionHeader title="Cycle Insights" action="View Details" onPress={onViewDetails} />
+        <SectionHeader title="Cycle Insights" />
         <View style={styles.list}>
           <InsightCard
             hero
@@ -220,7 +223,6 @@ export default function CycleInsightsSection({
             title="Typical cycle length"
             value={`${cycleLength} days`}
             subtitle="Used for your predictions"
-            onPress={() => onPressInsight?.('cycleLength')}
           />
           <InsightCard
             icon="water"
@@ -231,7 +233,6 @@ export default function CycleInsightsSection({
             title="Typical period length"
             value={`${periodLength} days`}
             subtitle="Used for your predictions"
-            onPress={() => onPressInsight?.('periodLength')}
           />
           <InsightCard
             icon="radio-button-on"
@@ -242,7 +243,6 @@ export default function CycleInsightsSection({
             title="Estimated ovulation"
             value={ovulation ? formatShort(ovulation) : '–'}
             subtitle="Estimated ovulation date"
-            onPress={() => onPressInsight?.('ovulation')}
           />
         </View>
       </View>
