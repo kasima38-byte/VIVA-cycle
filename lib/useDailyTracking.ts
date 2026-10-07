@@ -57,6 +57,7 @@ export function useDailyTracking() {
       cervicalMucus: saved.cervicalMucus,
       cervicalMucusNote: saved.cervicalMucusNote,
       sexualActivity: saved.sexualActivity,
+      medications: saved.medications,
     }),
     [base, saved]
   );

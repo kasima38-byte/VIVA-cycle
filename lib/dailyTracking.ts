@@ -13,6 +13,8 @@ import { MUCUS_OBSERVATIONS, normalizeMucusNote } from './cervicalMucus';
 import type { MucusValue } from './cervicalMucus';
 import { normalizeSexualActivity } from './sexualActivity';
 import type { SexualActivity } from './sexualActivity';
+import { normalizeMedications } from './medications';
+import type { MedicationEntry } from './medications';
 
 // ---------- Values ----------
 
@@ -21,6 +23,7 @@ export type FlowValue = 'none' | 'spotting' | 'light' | 'medium' | 'heavy';
 export type MoodValue = 'very_low' | 'low' | 'okay' | 'good' | 'great';
 export type { MucusValue }; // defined with the central list in lib/cervicalMucus.ts
 export type { SexualActivity }; // defined in lib/sexualActivity.ts
+export type { MedicationEntry }; // defined in lib/medications.ts
 /** Earlier single-word form - only read when converting older saved data. */
 export type SexualActivityValue = 'none' | 'protected' | 'unprotected';
 
@@ -34,7 +37,7 @@ export type DailyTrackingRecord = {
   cervicalMucus: MucusValue | null;
   cervicalMucusNote: string | null;          // optional note, only with "Unusual / Other"
   sexualActivity: SexualActivity | null;      // private: the card only ever says "Tracked"
-  medications: string[] | null;              // [] = she chose "None taken"
+  medications: MedicationEntry[] | null;     // private: the card only shows a count
   updatedAt: string | null;                  // ISO time of last save; null = never saved
 };
 
@@ -172,7 +175,7 @@ export function normalizeRecord(date: string, raw: unknown): DailyTrackingRecord
     cervicalMucus: mucus,
     cervicalMucusNote: mucus === 'other' ? normalizeMucusNote(r.cervicalMucusNote) : null,
     sexualActivity: normalizeSexualActivity(r.sexualActivity),
-    medications: stringList(r.medications),
+    medications: normalizeMedications(r.medications, date),
     updatedAt: typeof r.updatedAt === 'string' ? r.updatedAt : null,
   };
 }
@@ -213,12 +216,6 @@ export function sameTrackedData(a: DailyTrackingRecord, b: DailyTrackingRecord):
 
 export const NOT_TRACKED = 'Not tracked';
 
-function listShort(values: string[], options: Option<string>[], noneLabel: string): string {
-  if (values.length === 0) return noneLabel;
-  const labels = values.map((v) => labelOf(options, v));
-  return labels.length <= 2 ? labels.join(', ') : labels[0] + ' + ' + (labels.length - 1) + ' more';
-}
-
 function listFull(values: string[], options: Option<string>[], noneLabel: string): string {
   return values.length === 0 ? noneLabel : values.map((v) => labelOf(options, v)).join(', ');
 }
@@ -234,7 +231,6 @@ export function fieldFullText(record: DailyTrackingRecord, field: TrackedField):
 }
 
 function fieldText(record: DailyTrackingRecord, field: TrackedField, full: boolean): string {
-  const list = full ? listFull : listShort;
   switch (field) {
     case 'period':
       return record.period ? labelOf(PERIOD_OPTIONS, record.period) : NOT_TRACKED;
@@ -257,7 +253,9 @@ function fieldText(record: DailyTrackingRecord, field: TrackedField, full: boole
       // Private: the card and screen readers only ever say "Tracked"
       return record.sexualActivity ? 'Tracked' : NOT_TRACKED;
     case 'medications':
-      return record.medications ? list(record.medications, MEDICATION_OPTIONS, 'None taken') : NOT_TRACKED;
+      // Private: the card and screen readers only ever hear a count; names stay inside the sheet
+      if (!record.medications || record.medications.length === 0) return NOT_TRACKED;
+      return record.medications.length + ' recorded';
   }
 }
 

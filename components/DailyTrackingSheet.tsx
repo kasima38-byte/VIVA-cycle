@@ -103,14 +103,7 @@ function renderOptions(field: SheetField, record: DailyTrackingRecord, onChange:
         />
       );
     case 'medications':
-      return (
-        <MultiChoice
-          options={MEDICATION_OPTIONS}
-          value={record.medications}
-          noneLabel="None taken"
-          onChange={(v) => onChange('medications', v)}
-        />
-      );
+      return null; // has its own sheet: components/MedicationsSheet.tsx
   }
 }
 

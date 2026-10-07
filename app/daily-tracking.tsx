@@ -13,6 +13,7 @@ import FlowSheet from '../components/FlowSheet';
 import SymptomsSheet from '../components/SymptomsSheet';
 import MucusSheet from '../components/MucusSheet';
 import SexualActivitySheet from '../components/SexualActivitySheet';
+import MedicationsSheet from '../components/MedicationsSheet';
 import DateSelector, { DateItem } from '../components/DateSelector';
 import EnergySlider from '../components/EnergySlider';
 import MoodSelector from '../components/MoodSelector';
@@ -115,6 +116,7 @@ export default function DailyTrackingScreen() {
   const [symptomsOpen, setSymptomsOpen] = useState(false);
   const [mucusOpen, setMucusOpen] = useState(false);
   const [sexOpen, setSexOpen] = useState(false);
+  const [medsOpen, setMedsOpen] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const stickyHeight = useRef(0);
   const sectionY = useRef({ mood: 0, energy: 0 });
@@ -191,6 +193,10 @@ export default function DailyTrackingScreen() {
     }
     if (field === 'sexualActivity') {
       setSexOpen(true);
+      return;
+    }
+    if (field === 'medications') {
+      setMedsOpen(true);
       return;
     }
     setSheet(field);
@@ -466,6 +472,14 @@ export default function DailyTrackingScreen() {
           </Text>
         </Pressable>
       </View>
+
+      <MedicationsSheet
+        visible={medsOpen}
+        date={selectedDate}
+        today={today}
+        onClose={() => setMedsOpen(false)}
+        onFeedback={show}
+      />
 
       <SexualActivitySheet
         visible={sexOpen}
