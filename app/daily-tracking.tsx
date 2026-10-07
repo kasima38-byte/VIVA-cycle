@@ -396,6 +396,17 @@ export default function DailyTrackingScreen() {
             <View style={{ marginTop: spacing.md }}>
               <EnergySlider value={record.energy} onChange={(v) => setField('energy', v)} disabled={!canEdit} />
             </View>
+            {record.energy !== null && canEdit && (
+              <Pressable
+                onPress={() => setField('energy', null)}
+                style={styles.clearLink}
+                accessibilityRole="button"
+                accessibilityLabel="Clear energy"
+                accessibilityHint="Sets energy back to not tracked"
+              >
+                <Text style={styles.clearLinkText}>Clear energy</Text>
+              </Pressable>
+            )}
           </View>
         </ScrollView>
       </SafeAreaView>

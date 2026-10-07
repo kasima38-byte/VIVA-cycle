@@ -95,14 +95,28 @@ export function labelOf<T extends string>(options: Option<T>[], value: T): strin
 
 export const ENERGY_LEVELS = ['Very low', 'Low', 'Moderate', 'High', 'Very high'] as const;
 
-/** 0-19 Very low, 20-39 Low, 40-59 Moderate, 60-79 High, 80-100 Very high */
+/** The one energy mapping: 0-20 Very low, 21-40 Low, 41-60 Moderate, 61-80 High, 81-100 Very high */
 export function energyLabel(value: number): string {
   const v = Math.max(0, Math.min(100, value));
-  return ENERGY_LEVELS[Math.min(4, Math.floor(v / 20))];
+  if (v <= 20) return ENERGY_LEVELS[0];
+  if (v <= 40) return ENERGY_LEVELS[1];
+  if (v <= 60) return ENERGY_LEVELS[2];
+  if (v <= 80) return ENERGY_LEVELS[3];
+  return ENERGY_LEVELS[4];
 }
 
-/** Where the slider starts before she touches it (shown as untracked until she does). */
+export const getEnergyLabel = energyLabel;
+
+/** Neutral slider position before she touches it. Shown as "Not tracked" - never saved unless she chooses it. */
 export const ENERGY_START = 50;
+
+/** The slider snaps to steps of 5 (no jitter); the - / + buttons and screen readers move 10. */
+export const ENERGY_STEP = 5;
+export const ENERGY_BUTTON_STEP = 10;
+
+export function snapEnergy(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value / ENERGY_STEP) * ENERGY_STEP));
+}
 
 // ---------- Creating and cleaning records ----------
 
