@@ -8,6 +8,7 @@
 // Storage: lib/dailyTrackingService.ts. Screen state: lib/useDailyTracking.ts.
 
 import { addDays, keyToLocalDate } from '../constants/dateUtils';
+import { SYMPTOMS, normalizeSymptomIds } from './symptoms';
 
 // ---------- Values ----------
 
@@ -75,18 +76,8 @@ export const SEXUAL_ACTIVITY_OPTIONS: Option<SexualActivityValue>[] = [
   { value: 'unprotected', label: 'Unprotected sex' },
 ];
 
-export const SYMPTOM_OPTIONS: Option<string>[] = [
-  { value: 'cramps', label: 'Cramps' },
-  { value: 'headache', label: 'Headache' },
-  { value: 'bloating', label: 'Bloating' },
-  { value: 'breastTenderness', label: 'Breast tenderness' },
-  { value: 'backPain', label: 'Back pain' },
-  { value: 'acne', label: 'Acne' },
-  { value: 'nausea', label: 'Nausea' },
-  { value: 'fatigue', label: 'Fatigue' },
-  { value: 'cravings', label: 'Cravings' },
-  { value: 'moodSwings', label: 'Mood swings' },
-];
+// Labels come from the central symptom library (lib/symptoms.ts)
+export const SYMPTOM_OPTIONS: Option<string>[] = SYMPTOMS.map((s) => ({ value: s.id, label: s.label }));
 
 export const MEDICATION_OPTIONS: Option<string>[] = [
   { value: 'painRelief', label: 'Pain relief' },
@@ -139,6 +130,12 @@ function stringList(v: unknown): string[] | null {
   return Array.from(new Set(v.filter((s): s is string => typeof s === 'string' && s.length > 0)));
 }
 
+/** Symptom IDs: no duplicates, stored in library order. */
+function symptomList(v: unknown): string[] | null {
+  const list = stringList(v);
+  return list ? normalizeSymptomIds(list) : null;
+}
+
 /** Turns anything read from storage (including older entries that only had
  *  mood/energy/symptoms) into a complete, valid record for that date. */
 export function normalizeRecord(date: string, raw: unknown): DailyTrackingRecord {
@@ -151,7 +148,7 @@ export function normalizeRecord(date: string, raw: unknown): DailyTrackingRecord
     date,
     period: oneOf(PERIOD_OPTIONS, r.period),
     flow: oneOf(FLOW_OPTIONS, r.flow),
-    symptoms: stringList(r.symptoms),
+    symptoms: symptomList(r.symptoms),
     mood: oneOf(MOOD_OPTIONS, r.mood),
     energy,
     cervicalMucus: oneOf(MUCUS_OPTIONS, r.cervicalMucus),
@@ -225,7 +222,12 @@ function fieldText(record: DailyTrackingRecord, field: TrackedField, full: boole
     case 'flow':
       return record.flow ? labelOf(FLOW_OPTIONS, record.flow) : NOT_TRACKED;
     case 'symptoms':
-      return record.symptoms ? list(record.symptoms, SYMPTOM_OPTIONS, 'No symptoms') : NOT_TRACKED;
+      // The card shows a count only (calm and private); names are for screen readers and the sheet
+      if (!record.symptoms) return NOT_TRACKED;
+      if (record.symptoms.length === 0) return 'No symptoms';
+      return full
+        ? record.symptoms.length + ' selected: ' + listFull(record.symptoms, SYMPTOM_OPTIONS, '')
+        : record.symptoms.length + ' selected';
     case 'mood':
       return record.mood ? labelOf(MOOD_OPTIONS, record.mood) : NOT_TRACKED;
     case 'energy':

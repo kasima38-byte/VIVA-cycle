@@ -45,12 +45,13 @@ export function useDailyTracking() {
   const saved = useMemo(() => readDailyRecord(selectedDate), [selectedDate, dailyLogs]);
 
   // Never show another date's answers, even for a single frame
-  // Period and flow are saved directly by their own sheets, so their cards always show the saved values
+  // Period, flow and symptoms are saved directly by their own sheets,
+  // so their cards always show the saved values
   const base = draft.date === selectedDate ? draft : saved;
-  const record =
-    base.period === saved.period && base.flow === saved.flow
-      ? base
-      : { ...base, period: saved.period, flow: saved.flow };
+  const record = useMemo(
+    () => ({ ...base, period: saved.period, flow: saved.flow, symptoms: saved.symptoms }),
+    [base, saved]
+  );
 
   const draftRef = useRef(record);
   draftRef.current = record;

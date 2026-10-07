@@ -43,9 +43,9 @@ export async function saveDailyRecord(record: DailyTrackingRecord): Promise<Save
   if (!canLog(record.date, getToday())) return 'future';
 
   const existing = readDailyRecord(record.date);
-  // Period (lib/periodService.ts) and flow (lib/flowService.ts) are saved by their own sheets:
-  // a Daily Tracking save never changes them
-  const toSave = { ...record, period: existing.period, flow: existing.flow };
+  // Period, flow and symptoms are saved by their own sheets (lib/periodService.ts,
+  // lib/flowService.ts, lib/symptomService.ts): a Daily Tracking save never changes them
+  const toSave = { ...record, period: existing.period, flow: existing.flow, symptoms: existing.symptoms };
   if (sameTrackedData(existing, toSave)) return 'unchanged';
 
   const ok = await putDailyLog(normalizeRecord(record.date, toSave));
