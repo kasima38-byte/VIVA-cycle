@@ -13,7 +13,7 @@
 // is a different measurement and lives in lib/cycleEngine.ts.
 
 import { addDays, diffDays, MIN_DAYS_BETWEEN_PERIODS, PeriodLog } from './cycleEngine';
-import type { DailyTrackingRecord } from './dailyTracking';
+import type { DailyTrackingRecord, FlowValue } from './dailyTracking';
 
 type Logs = Record<string, Pick<DailyTrackingRecord, 'period'>>;
 
@@ -92,9 +92,19 @@ export function periodInfoOn(logs: Logs, date: string): PeriodDayInfo {
   return { date, status: 'period', episode, dayNumber: episode ? diffDays(date, episode.start) + 1 : null };
 }
 
-/** For the calendar: recorded bleeding days, and days she explicitly marked as no period. */
-export function bleedingMarks(logs: Logs): { period: Set<string>; notPeriod: Set<string> } {
-  return { period: new Set(bleedingDates(logs)), notPeriod: new Set(notPeriodDates(logs)) };
+/** For the calendar: recorded bleeding days, days she explicitly marked as no period, and each
+ *  day's recorded flow / spotting (so spotting can be shown apart from period days). */
+export function bleedingMarks(logs: Record<string, Pick<DailyTrackingRecord, 'period' | 'flow'>>): {
+  period: Set<string>;
+  notPeriod: Set<string>;
+  flow: Record<string, FlowValue>;
+} {
+  const flow: Record<string, FlowValue> = {};
+  for (const d of Object.keys(logs)) {
+    const f = logs[d]?.flow;
+    if (f) flow[d] = f;
+  }
+  return { period: new Set(bleedingDates(logs)), notPeriod: new Set(notPeriodDates(logs)), flow };
 }
 
 export function rangeDates(start: string, end: string): string[] {

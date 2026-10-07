@@ -46,7 +46,7 @@ export const PERIOD_OPTIONS: Option<PeriodStatus>[] = [
 ];
 
 export const FLOW_OPTIONS: Option<FlowValue>[] = [
-  { value: 'none', label: 'No flow' },
+  { value: 'none', label: 'No bleeding' },
   { value: 'spotting', label: 'Spotting' },
   { value: 'light', label: 'Light' },
   { value: 'medium', label: 'Medium' },
