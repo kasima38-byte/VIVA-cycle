@@ -9,6 +9,8 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import DailyHeroCard from '../components/DailyHeroCard';
 import DailyTrackingSheet, { SheetField } from '../components/DailyTrackingSheet';
 import PeriodSheet, { recordedText } from '../components/PeriodSheet';
+import { isFieldVisible, trackingProgress } from '../lib/dailyTrackingSettings';
+import { useTrackingSettings } from '../lib/dailyTrackingSettingsService';
 import FlowSheet from '../components/FlowSheet';
 import SymptomsSheet from '../components/SymptomsSheet';
 import MucusSheet from '../components/MucusSheet';
@@ -107,6 +109,10 @@ export default function DailyTrackingScreen() {
     state, periodInfo, saveStatus, justSaved, dirty, saving, setField, save, flush, selectDate,
   } = useDailyTracking();
   const insets = useSafeAreaInsets();
+  // Settings decide what is SHOWN - recorded data is never changed by them
+  const { settings: trackingSettings } = useTrackingSettings();
+  const showMood = isFieldVisible(trackingSettings, 'mood');
+  const showEnergy = isFieldVisible(trackingSettings, 'energy');
   const navigation = useNavigation();
   const { toast, opacity, show } = useToast();
 
@@ -270,7 +276,9 @@ export default function DailyTrackingScreen() {
   });
 
   // Hero card text reflects the day and how much is tracked
-  const count = trackedCount(record);
+  // Progress counts only the categories that are switched on (each once)
+  const progress = trackingProgress(record, trackingSettings);
+  const count = progress.count;
   const heroTitle =
     relation === 'future'
       ? 'Not here yet'
@@ -280,10 +288,12 @@ export default function DailyTrackingScreen() {
   const heroSubtitle =
     relation === 'future'
       ? 'You can track this day when it arrives.'
-      : state === 'complete'
-        ? 'All ' + TRACKED_FIELDS.length + ' categories tracked.'
-        : state === 'partial'
-          ? count + ' of ' + TRACKED_FIELDS.length + ' categories tracked'
+      : progress.state === 'complete'
+        ? progress.total === 1
+          ? 'Tracked for this day.'
+          : 'All ' + progress.total + ' categories tracked.'
+        : progress.state === 'partial'
+          ? count + ' of ' + progress.total + ' categories tracked'
           : relation === 'today'
             ? 'How are you feeling today?'
             : 'How were you feeling that day?';
@@ -395,7 +405,7 @@ export default function DailyTrackingScreen() {
           <DailyHeroCard title={heroTitle} subtitle={heroSubtitle} />
 
           <View style={styles.grid}>
-            {CARDS.map((c) => (
+            {CARDS.filter((c) => isFieldVisible(trackingSettings, c.field)).map((c) => (
               <View key={c.field} style={styles.gridItem}>
                 <TrackingCard
                   icon={c.icon}
@@ -410,6 +420,7 @@ export default function DailyTrackingScreen() {
             ))}
           </View>
 
+          {showMood && (
           <View
             style={styles.moodCard}
             onLayout={(e) => {
@@ -443,6 +454,9 @@ export default function DailyTrackingScreen() {
             )}
           </View>
 
+          )}
+
+          {showEnergy && (
           <View
             style={styles.moodCard}
             onLayout={(e) => {
@@ -468,6 +482,7 @@ export default function DailyTrackingScreen() {
               </Pressable>
             )}
           </View>
+          )}
         </ScrollView>
       </SafeAreaView>
 

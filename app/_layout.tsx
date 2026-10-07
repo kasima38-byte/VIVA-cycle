@@ -4,12 +4,15 @@ import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { listenForReminderTaps, syncReminders } from '../lib/notifications';
 import { getVivaState, loadVivaStore, retryLoadVivaStore, useVivaStore } from '../lib/vivaStore';
+import { loadTrackingSettings, useTrackingSettings } from '../lib/dailyTrackingSettingsService';
 
 export default function RootLayout() {
   const { loaded, loadError, periods, baseline, goal, reminders } = useVivaStore();
+  const { loaded: settingsLoaded } = useTrackingSettings();
 
   useEffect(() => {
     loadVivaStore();
+    loadTrackingSettings();
     return listenForReminderTaps((url) => router.push(url as any));
   }, []);
 
@@ -18,7 +21,7 @@ export default function RootLayout() {
     if (loaded && !loadError) syncReminders(getVivaState());
   }, [loaded, loadError, periods, baseline, goal, reminders]);
 
-  if (!loaded) {
+  if (!loaded || !settingsLoaded) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FAEFF5' }}>
         <ActivityIndicator color="#E9006F" />

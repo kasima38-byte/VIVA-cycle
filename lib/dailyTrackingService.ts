@@ -1,3 +1,4 @@
+import { TRACKED_FIELDS } from './dailyTracking';
 // VIVA Cycle - Daily Tracking service
 //
 // The ONLY way screens read or change Daily Tracking data:
@@ -10,7 +11,7 @@ import { getToday, isValidDateKey } from '../constants/dateUtils';
 import {
   DailyTrackingRecord, TrackedField, canLog, emptyRecord, normalizeRecord, sameTrackedData,
 } from './dailyTracking';
-import { getVivaState, putDailyLog, removeDailyLog } from './vivaStore';
+import { clearTrackingDataKeepPeriods, getVivaState, putDailyLog, removeDailyLog } from './vivaStore';
 import { PeriodResult, removePeriodDay } from './periodService';
 import { monthsBetween } from './dailyStorage';
 
@@ -165,4 +166,26 @@ export function getLatestTrackedDate(): string | null {
  *  until she actually records something. */
 export function createDailyRecord(date: string): DailyTrackingRecord | null {
   return isValidDateKey(date) ? emptyRecord(date) : null;
+}
+
+// ---------- Clear Daily Tracking data (Settings) ----------
+
+export type ClearSummary = { daysAffected: number; periodDaysKept: number };
+
+/** What clearing would remove - read only, nothing is changed. */
+export function getClearSummary(): ClearSummary {
+  let daysAffected = 0;
+  let periodDaysKept = 0;
+  for (const rec of Object.values(getVivaState().dailyLogs)) {
+    if (TRACKED_FIELDS.some((f) => f !== 'period' && rec[f] !== null)) daysAffected++;
+    if (rec.period !== null) periodDaysKept++;
+  }
+  return { daysAffected, periodDaysKept };
+}
+
+/** Permanently remove everything recorded in Daily Tracking except period days.
+ *  Call only after the user has explicitly confirmed. */
+export async function clearAllTrackingData(): Promise<'saved' | 'unchanged' | 'failed'> {
+  if (getClearSummary().daysAffected === 0) return 'unchanged';
+  return (await clearTrackingDataKeepPeriods()) ? 'saved' : 'failed';
 }

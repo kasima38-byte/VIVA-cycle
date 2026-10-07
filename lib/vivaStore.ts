@@ -404,6 +404,19 @@ export function applyPeriodChanges(changes: PeriodChanges): Promise<boolean> {
   return updateDailyLogs(withPeriodChanges(state.dailyLogs, changes, new Date().toISOString()));
 }
 
+/** Remove everything recorded in Daily Tracking EXCEPT period days (the cycle history).
+ *  Only the explicit confirmation in Daily Tracking Settings calls this. */
+export function clearTrackingDataKeepPeriods(): Promise<boolean> {
+  if (!canSave) return Promise.resolve(false);
+  const now = new Date().toISOString();
+  const next: Record<string, DailyLog> = {};
+  for (const [date, rec] of Object.entries(state.dailyLogs)) {
+    if (rec.period === null) continue;
+    next[date] = { ...normalizeRecord(date, { date, period: rec.period }), createdAt: rec.createdAt, updatedAt: now };
+  }
+  return updateDailyLogs(next);
+}
+
 /** Turn one reminder on or off. */
 export function setReminder(key: string, on: boolean) {
   update({ reminders: { ...state.reminders, [key]: on } });
