@@ -52,6 +52,7 @@ export async function saveDailyRecord(record: DailyTrackingRecord): Promise<Save
     symptoms: existing.symptoms,
     cervicalMucus: existing.cervicalMucus,         // lib/mucusService.ts
     cervicalMucusNote: existing.cervicalMucusNote,
+    sexualActivity: existing.sexualActivity,       // lib/sexualActivityService.ts
   };
   if (sameTrackedData(existing, toSave)) return 'unchanged';
 

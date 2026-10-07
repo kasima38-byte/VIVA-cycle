@@ -11,6 +11,8 @@ import { addDays, keyToLocalDate } from '../constants/dateUtils';
 import { SYMPTOMS, normalizeSymptomIds } from './symptoms';
 import { MUCUS_OBSERVATIONS, normalizeMucusNote } from './cervicalMucus';
 import type { MucusValue } from './cervicalMucus';
+import { normalizeSexualActivity } from './sexualActivity';
+import type { SexualActivity } from './sexualActivity';
 
 // ---------- Values ----------
 
@@ -18,6 +20,8 @@ export type PeriodStatus = 'yes' | 'no';
 export type FlowValue = 'none' | 'spotting' | 'light' | 'medium' | 'heavy';
 export type MoodValue = 'very_low' | 'low' | 'okay' | 'good' | 'great';
 export type { MucusValue }; // defined with the central list in lib/cervicalMucus.ts
+export type { SexualActivity }; // defined in lib/sexualActivity.ts
+/** Earlier single-word form - only read when converting older saved data. */
 export type SexualActivityValue = 'none' | 'protected' | 'unprotected';
 
 export type DailyTrackingRecord = {
@@ -29,7 +33,7 @@ export type DailyTrackingRecord = {
   energy: number | null;                     // 0-100
   cervicalMucus: MucusValue | null;
   cervicalMucusNote: string | null;          // optional note, only with "Unusual / Other"
-  sexualActivity: SexualActivityValue | null;
+  sexualActivity: SexualActivity | null;      // private: the card only ever says "Tracked"
   medications: string[] | null;              // [] = she chose "None taken"
   updatedAt: string | null;                  // ISO time of last save; null = never saved
 };
@@ -167,7 +171,7 @@ export function normalizeRecord(date: string, raw: unknown): DailyTrackingRecord
     energy,
     cervicalMucus: mucus,
     cervicalMucusNote: mucus === 'other' ? normalizeMucusNote(r.cervicalMucusNote) : null,
-    sexualActivity: oneOf(SEXUAL_ACTIVITY_OPTIONS, r.sexualActivity),
+    sexualActivity: normalizeSexualActivity(r.sexualActivity),
     medications: stringList(r.medications),
     updatedAt: typeof r.updatedAt === 'string' ? r.updatedAt : null,
   };
@@ -250,7 +254,8 @@ function fieldText(record: DailyTrackingRecord, field: TrackedField, full: boole
     case 'cervicalMucus':
       return record.cervicalMucus ? labelOf(MUCUS_OPTIONS, record.cervicalMucus) : NOT_TRACKED;
     case 'sexualActivity':
-      return record.sexualActivity ? labelOf(SEXUAL_ACTIVITY_OPTIONS, record.sexualActivity) : NOT_TRACKED;
+      // Private: the card and screen readers only ever say "Tracked"
+      return record.sexualActivity ? 'Tracked' : NOT_TRACKED;
     case 'medications':
       return record.medications ? list(record.medications, MEDICATION_OPTIONS, 'None taken') : NOT_TRACKED;
   }

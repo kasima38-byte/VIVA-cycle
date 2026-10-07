@@ -82,14 +82,15 @@ async function main() {
 
   console.log('TEST 10 - adding flow keeps everything else');
   await svc.updateDailyRecord(P1, {
-    mood: 'good', energy: 50, sexualActivity: 'none', medications: ['iron'],
+    mood: 'good', energy: 50, medications: ['iron'],
   });
+  await require('../lib/sexualActivityService').saveSexualActivity(P1, 'none');
   await require('../lib/symptomService').saveSymptoms(P1, ['headache']);
   await period.markPeriodDay(P1);
   await flow.saveFlow(P1, 'medium');
   const r1 = rec(P1);
   check('mood, energy, symptoms, sexual activity, medications intact',
-    r1.mood === 'good' && r1.energy === 50 && eq(r1.symptoms, ['headache']) && r1.sexualActivity === 'none' && eq(r1.medications, ['iron']) && r1.flow === 'medium', r1);
+    r1.mood === 'good' && r1.energy === 50 && eq(r1.symptoms, ['headache']) && r1.sexualActivity && r1.sexualActivity.status === 'none' && eq(r1.medications, ['iron']) && r1.flow === 'medium', r1);
 
   console.log('PROTECTION - Daily Tracking Save never changes flow');
   check('saving a flow change through Daily Tracking is ignored', (await svc.updateDailyRecord(P1, { flow: 'heavy' })) === 'unchanged' && rec(P1).flow === 'medium', rec(P1));

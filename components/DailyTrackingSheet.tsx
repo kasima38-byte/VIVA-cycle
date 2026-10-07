@@ -92,13 +92,7 @@ function renderOptions(field: SheetField, record: DailyTrackingRecord, onChange:
     case 'cervicalMucus':
       return <SingleChoice options={MUCUS_OPTIONS} value={record.cervicalMucus} onSelect={(v) => onChange('cervicalMucus', v)} />;
     case 'sexualActivity':
-      return (
-        <SingleChoice
-          options={SEXUAL_ACTIVITY_OPTIONS}
-          value={record.sexualActivity}
-          onSelect={(v) => onChange('sexualActivity', v)}
-        />
-      );
+      return null; // has its own private sheet: components/SexualActivitySheet.tsx
     case 'symptoms':
       return (
         <MultiChoice
