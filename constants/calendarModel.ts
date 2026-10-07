@@ -28,7 +28,8 @@ export function buildCalendarMonth(
   periods: PeriodLog[],
   est: CycleEstimate | null,
   sexDates: string[],
-  todayKey: string
+  todayKey: string,
+  bleeding?: { period: Set<string>; notPeriod: Set<string> } // recorded bleeding days (the facts)
 ): DayModel[] {
   const confirmedDays = new Set<string>();
   const predictedDays = new Set<string>();
@@ -62,6 +63,13 @@ export function buildCalendarMonth(
       addRange(fertileDays, c.fertileStart, c.fertileEnd);
       ovulationDays.add(c.ovulation);
     });
+  }
+
+  // 3. Recorded bleeding days are confirmed period days. A day she marked "no period"
+  //    is never drawn as predicted bleeding.
+  if (bleeding) {
+    bleeding.period.forEach((d) => confirmedDays.add(d));
+    bleeding.notPeriod.forEach((d) => predictedDays.delete(d));
   }
 
   const sex = new Set(sexDates);

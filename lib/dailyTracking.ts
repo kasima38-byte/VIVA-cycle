@@ -41,8 +41,8 @@ export const TRACKED_FIELDS: TrackedField[] = [
 export type Option<T extends string> = { value: T; label: string };
 
 export const PERIOD_OPTIONS: Option<PeriodStatus>[] = [
-  { value: 'yes', label: 'Period today' },
-  { value: 'no', label: 'Not today' },
+  { value: 'yes', label: 'Period day' },
+  { value: 'no', label: 'No period' },
 ];
 
 export const FLOW_OPTIONS: Option<FlowValue>[] = [

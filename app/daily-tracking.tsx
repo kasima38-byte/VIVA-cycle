@@ -8,6 +8,7 @@ import { AccessibilityInfo, Animated, Pressable, ScrollView, StyleSheet, Text, V
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import DailyHeroCard from '../components/DailyHeroCard';
 import DailyTrackingSheet, { SheetField } from '../components/DailyTrackingSheet';
+import PeriodSheet, { recordedText } from '../components/PeriodSheet';
 import DateSelector, { DateItem } from '../components/DateSelector';
 import EnergySlider from '../components/EnergySlider';
 import MoodSelector from '../components/MoodSelector';
@@ -98,13 +99,14 @@ function useToast() {
 export default function DailyTrackingScreen() {
   const {
     today, selectedDate, relation, canEdit, visibleDates, loggedDates, record, savedAt,
-    state, saveStatus, dirty, saving, setField, save, flush, selectDate,
+    state, periodInfo, saveStatus, dirty, saving, setField, save, flush, selectDate,
   } = useDailyTracking();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { toast, opacity, show } = useToast();
 
   const [sheet, setSheet] = useState<SheetField | null>(null);
+  const [periodOpen, setPeriodOpen] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const stickyHeight = useRef(0);
   const sectionY = useRef({ mood: 0, energy: 0 });
@@ -163,8 +165,28 @@ export default function DailyTrackingScreen() {
       scrollRef.current?.scrollTo({ y: Math.max(0, y), animated: true });
       return;
     }
+    if (field === 'period') {
+      setPeriodOpen(true);
+      return;
+    }
     setSheet(field);
   };
+
+  // Period card: day number within the bleeding episode (not the cycle day)
+  const periodText =
+    periodInfo.status === 'period'
+      ? periodInfo.dayNumber
+        ? 'Day ' + periodInfo.dayNumber
+        : 'Period day'
+      : periodInfo.status === 'notPeriod'
+        ? 'No period'
+        : 'Not tracked';
+  const periodFull =
+    periodInfo.status === 'period' && periodInfo.episode
+      ? 'Period day ' + periodInfo.dayNumber + ', ' + recordedText(periodInfo.episode.recordedDays)
+      : periodText;
+  const cardStatus = (f: TrackedField) => (f === 'period' ? periodText : fieldSummary(record, f));
+  const cardFullStatus = (f: TrackedField) => (f === 'period' ? periodFull : fieldFullText(record, f));
 
   const dateItems: DateItem[] = visibleDates.map((key) => {
     const d = keyToLocalDate(key);
@@ -306,8 +328,8 @@ export default function DailyTrackingScreen() {
                 <TrackingCard
                   icon={c.icon}
                   title={c.title}
-                  status={fieldSummary(record, c.field)}
-                  fullStatus={fieldFullText(record, c.field)}
+                  status={cardStatus(c.field)}
+                  fullStatus={cardFullStatus(c.field)}
                   tracked={isTracked(record, c.field)}
                   disabled={!canEdit}
                   onPress={() => openField(c.field)}
@@ -393,6 +415,14 @@ export default function DailyTrackingScreen() {
           </Text>
         </Pressable>
       </View>
+
+      <PeriodSheet
+        visible={periodOpen}
+        date={selectedDate}
+        today={today}
+        onClose={() => setPeriodOpen(false)}
+        onFeedback={show}
+      />
 
       <DailyTrackingSheet
         field={sheet}

@@ -13,6 +13,7 @@ import {
   canLog, dateRelation, sameTrackedData, trackingState,
 } from './dailyTracking';
 import { SaveResult, readDailyRecord, saveDailyRecord } from './dailyTrackingService';
+import { periodInfoOn } from './periodTracking';
 import { useToday } from './useToday';
 import { useVivaStore } from './vivaStore';
 
@@ -44,7 +45,9 @@ export function useDailyTracking() {
   const saved = useMemo(() => readDailyRecord(selectedDate), [selectedDate, dailyLogs]);
 
   // Never show another date's answers, even for a single frame
-  const record = draft.date === selectedDate ? draft : saved;
+  // Period days are saved directly by the Period sheet, so the card always shows the saved value
+  const base = draft.date === selectedDate ? draft : saved;
+  const record = base.period === saved.period ? base : { ...base, period: saved.period };
 
   const draftRef = useRef(record);
   draftRef.current = record;
@@ -69,6 +72,7 @@ export function useDailyTracking() {
   const hasSaved = Object.prototype.hasOwnProperty.call(dailyLogs, selectedDate);
   const saveStatus: SaveStatus = dirty ? 'unsaved' : hasSaved ? 'saved' : 'notSaved';
   const state: TrackingState = trackingState(record);
+  const periodInfo = useMemo(() => periodInfoOn(dailyLogs, selectedDate), [dailyLogs, selectedDate]);
 
   const loggedDates = useMemo(() => new Set(Object.keys(dailyLogs)), [dailyLogs]);
   const visibleDates = useMemo(
@@ -146,6 +150,7 @@ export function useDailyTracking() {
     record,            // what the cards show (the draft for selectedDate)
     savedAt: saved.updatedAt,
     state,             // 'empty' | 'partial' | 'complete'
+    periodInfo,        // bleeding status, episode and day number for selectedDate
     saveStatus,        // 'notSaved' | 'unsaved' | 'saved'
     dirty,
     saving,

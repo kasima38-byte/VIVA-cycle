@@ -9,9 +9,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSyncExternalStore } from 'react';
 import {
   CycleBaseline, DateStr, Goal, PeriodLog, PeriodLogResult,
-  applyPeriodCorrection, applyPeriodLog, applyPeriodRemoval, createInitialLogs,
+  addDays, applyPeriodCorrection, applyPeriodLog, applyPeriodRemoval, diffDays, todayLocal,
 } from './cycleEngine';
 import { DailyTrackingRecord, hasAnyData, normalizeRecord } from './dailyTracking';
+import { PeriodChanges, derivePeriodLogs, episodesFromLogs } from './periodTracking';
 import { isValidDateKey } from '../constants/dateUtils';
 
 /** One day of Daily Tracking (her own entries). Full model: lib/dailyTracking.ts */
@@ -19,7 +20,7 @@ export type DailyLog = DailyTrackingRecord;
 
 const STORAGE_KEY = 'viva-cycle:data';
 const BACKUP_KEY = 'viva-cycle:data-backup'; // last copy that was read successfully
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2; // 2: bleeding days are the stored period data
 
 export interface VivaData {
   version: number;
@@ -108,6 +109,43 @@ function update(patch: Partial<VivaData>): Promise<boolean> {
   return persist();
 }
 
+/** Every change to daily records goes through here, so the period start list
+ *  (calculated from bleeding days) can never go stale. */
+function updateDailyLogs(dailyLogs: Record<string, DailyLog>, extra: Partial<VivaData> = {}): Promise<boolean> {
+  return update({ ...extra, dailyLogs, periods: derivePeriodLogs(dailyLogs) });
+}
+
+/** Set or clear the `period` field on some days. Every other answer on those days is kept. */
+function withPeriodChanges(
+  logs: Record<string, DailyLog>, changes: PeriodChanges, stamp: string | null
+): Record<string, DailyLog> {
+  const next = { ...logs };
+  for (const [date, value] of Object.entries(changes)) {
+    if (!isValidDateKey(date)) continue;
+    const rec = normalizeRecord(date, next[date] ?? {});
+    const updated: DailyLog = { ...rec, period: value, updatedAt: stamp ?? rec.updatedAt };
+    if (hasAnyData(updated)) next[date] = updated;
+    else delete next[date];
+  }
+  return next;
+}
+
+/** Version 1 stored periods as start dates. From version 2 the bleeding DAYS are the stored
+ *  data and the start list is calculated from them. Each older period becomes its recorded
+ *  day(s): start to end if an end was logged, otherwise just the start day. */
+function periodData(version: unknown, oldPeriods: PeriodLog[], dailyLogs: Record<string, DailyLog>) {
+  let logs = dailyLogs;
+  if (typeof version !== 'number' || version < 2) {
+    const changes: PeriodChanges = {};
+    for (const p of oldPeriods) {
+      const end = p.end && p.end >= p.start ? p.end : p.start;
+      for (let d = p.start, n = 0; d <= end && n < 15; d = addDays(d, 1), n++) changes[d] = 'yes';
+    }
+    logs = withPeriodChanges(logs, changes, null);
+  }
+  return { dailyLogs: logs, periods: derivePeriodLogs(logs) };
+}
+
 let loading: Promise<void> | null = null;
 
 /** Clean every saved Daily Tracking day. The date KEY is the record's identity,
@@ -135,8 +173,7 @@ function parseSaved(raw: string): VivaData {
     ...EMPTY,
     ...saved,
     baseline: { ...EMPTY.baseline, ...(saved.baseline ?? {}) },
-    periods: sortPeriods(periods),
-    dailyLogs: parseDailyLogs(saved.dailyLogs),
+    ...periodData(saved.version, sortPeriods(periods), parseDailyLogs(saved.dailyLogs)),
     reminders: saved.reminders && typeof saved.reminders === 'object' && !Array.isArray(saved.reminders) ? saved.reminders : {},
     version: SCHEMA_VERSION,
   };
@@ -199,39 +236,68 @@ export interface SetupInput {
 
 /** Finish onboarding. Her last period start becomes the first confirmed log. */
 export function completeSetup(input: SetupInput) {
-  const already = state.periods.some((p) => p.start === input.lastPeriodStart);
-  const periods = already
-    ? state.periods
-    : sortPeriods([...state.periods, ...createInitialLogs(input.lastPeriodStart)]);
-  update({
+  // Her last period start becomes a recorded bleeding day; the start list is calculated from it
+  const dailyLogs = withPeriodChanges(state.dailyLogs, { [input.lastPeriodStart]: 'yes' }, new Date().toISOString());
+  void updateDailyLogs(dailyLogs, {
     setupComplete: true,
     name: input.name.trim(),
     dateOfBirth: input.dateOfBirth,
     baseline: input.baseline,
     goal: input.goal ?? state.goal,
-    periods,
   });
 }
 
 /** Log an ACTUAL period start (becomes Cycle Day 1 if it is the latest). Never changes other logs. */
 export function logPeriod(start: DateStr): PeriodLogResult {
-  const { result, logs } = applyPeriodLog(state.periods, start);
-  if (result.kind === 'added') update({ periods: logs });
+  const { result } = applyPeriodLog(state.periods, start);
+  if (result.kind === 'added') {
+    void updateDailyLogs(withPeriodChanges(state.dailyLogs, { [start]: 'yes' }, new Date().toISOString()));
+  }
   return result;
 }
 
 /** Fix a wrongly entered start date: the old record is replaced, never duplicated. */
 export function correctPeriodStart(oldStart: DateStr, newStart: DateStr): PeriodLogResult {
-  const { result, logs } = applyPeriodCorrection(state.periods, oldStart, newStart);
-  if (result.kind === 'replaced') update({ periods: logs });
+  const { result } = applyPeriodCorrection(state.periods, oldStart, newStart);
+  if (result.kind === 'replaced') {
+    // Move that period's recorded bleeding days by the same number of days (never into the future)
+    const shift = diffDays(newStart, oldStart);
+    const today = todayLocal();
+    const episode = episodesFromLogs(state.dailyLogs).find((e) => e.start === oldStart);
+    const days = episode ? episode.dates : [oldStart];
+    const changes: PeriodChanges = {};
+    days.forEach((d) => {
+      changes[d] = null;
+    });
+    days.forEach((d) => {
+      const moved = addDays(d, shift);
+      if (moved <= today) changes[moved] = 'yes';
+    });
+    void updateDailyLogs(withPeriodChanges(state.dailyLogs, changes, new Date().toISOString()));
+  }
   return result;
 }
 
 /** Delete a logged period (from Period History). Other records are untouched. */
 export function removePeriod(start: DateStr): 'removed' | 'notFound' | 'lastOne' {
-  const { result, logs } = applyPeriodRemoval(state.periods, start);
-  if (result.kind === 'removed') update({ periods: logs });
+  const { result } = applyPeriodRemoval(state.periods, start);
+  if (result.kind === 'removed') {
+    // Clear every recorded bleeding day of that period (up to the next period start)
+    const next = state.periods.map((p) => p.start).filter((s) => s > start).sort()[0];
+    const changes: PeriodChanges = {};
+    Object.keys(state.dailyLogs).forEach((d) => {
+      if (d >= start && (!next || d < next) && state.dailyLogs[d].period === 'yes') changes[d] = null;
+    });
+    void updateDailyLogs(withPeriodChanges(state.dailyLogs, changes, new Date().toISOString()));
+  }
   return result.kind;
+}
+
+/** Set or clear bleeding on several days at once (only the `period` field changes).
+ *  Use lib/periodService.ts rather than calling this directly. */
+export function applyPeriodChanges(changes: PeriodChanges): Promise<boolean> {
+  if (!canSave) return Promise.resolve(false);
+  return updateDailyLogs(withPeriodChanges(state.dailyLogs, changes, new Date().toISOString()));
 }
 
 /** Turn one reminder on or off. */
@@ -247,7 +313,7 @@ export function putDailyLog(record: DailyLog): Promise<boolean> {
   const dailyLogs = { ...state.dailyLogs };
   if (hasAnyData(clean)) dailyLogs[clean.date] = { ...clean, updatedAt: new Date().toISOString() };
   else delete dailyLogs[clean.date];
-  return update({ dailyLogs });
+  return updateDailyLogs(dailyLogs);
 }
 
 /** Merge a few answers into one day (kept for older callers). */
@@ -261,7 +327,7 @@ export function removeDailyLog(date: DateStr): Promise<boolean> {
   if (!canSave) return Promise.resolve(false);
   if (!(date in state.dailyLogs)) return Promise.resolve(true);
   const { [date]: _removed, ...rest } = state.dailyLogs;
-  return update({ dailyLogs: rest });
+  return updateDailyLogs(rest);
 }
 
 /** Settings change: affects future predictions only, never period history. */

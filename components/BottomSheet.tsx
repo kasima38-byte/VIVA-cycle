@@ -6,9 +6,14 @@ type Props = {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
+  primaryLabel?: string;        // defaults to "Done"
+  onPrimary?: () => void;       // defaults to onClose
+  primaryDisabled?: boolean;
 };
 
-export default function BottomSheet({ visible, title, onClose, children }: Props) {
+export default function BottomSheet({
+  visible, title, onClose, children, primaryLabel = 'Done', onPrimary, primaryDisabled = false,
+}: Props) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close" />
@@ -17,12 +22,14 @@ export default function BottomSheet({ visible, title, onClose, children }: Props
         <Text style={styles.title}>{title}</Text>
         <View style={styles.content}>{children}</View>
         <Pressable
-          style={styles.doneButton}
-          onPress={onClose}
+          style={[styles.doneButton, primaryDisabled && styles.doneDisabled]}
+          onPress={onPrimary ?? onClose}
+          disabled={primaryDisabled}
           accessibilityRole="button"
-          accessibilityLabel="Done"
+          accessibilityLabel={primaryLabel}
+          accessibilityState={{ disabled: primaryDisabled }}
         >
-          <Text style={styles.doneText}>Done</Text>
+          <Text style={[styles.doneText, primaryDisabled && styles.doneTextDisabled]}>{primaryLabel}</Text>
         </Pressable>
       </View>
     </Modal>
@@ -57,4 +64,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
   },
   doneText: { color: colors.white, fontWeight: '700', fontSize: 16 },
+  doneDisabled: { backgroundColor: colors.pinkSoft },
+  doneTextDisabled: { color: colors.magenta },
 });

@@ -43,9 +43,11 @@ export async function saveDailyRecord(record: DailyTrackingRecord): Promise<Save
   if (!canLog(record.date, getToday())) return 'future';
 
   const existing = readDailyRecord(record.date);
-  if (sameTrackedData(existing, record)) return 'unchanged';
+  // Period days belong to lib/periodService.ts: a Daily Tracking save never changes them
+  const toSave = { ...record, period: existing.period };
+  if (sameTrackedData(existing, toSave)) return 'unchanged';
 
-  const ok = await putDailyLog(normalizeRecord(record.date, record));
+  const ok = await putDailyLog(normalizeRecord(record.date, toSave));
   return ok ? 'saved' : 'failed';
 }
 

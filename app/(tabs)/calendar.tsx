@@ -1,3 +1,4 @@
+import { bleedingMarks } from '../../lib/periodTracking';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
@@ -36,8 +37,8 @@ export default function CalendarScreen() {
   const [monthIndex, setMonthIndex] = useState(todayDate.getMonth());
 
   const days = useMemo(
-    () => buildCalendarMonth(year, monthIndex, viva.periods, est, sexDates, today),
-    [year, monthIndex, viva.periods, est, today]
+    () => buildCalendarMonth(year, monthIndex, viva.periods, est, sexDates, today, bleedingMarks(viva.dailyLogs)),
+    [year, monthIndex, viva.periods, viva.dailyLogs, est, today]
   );
 
   const goPrevMonth = () => {
