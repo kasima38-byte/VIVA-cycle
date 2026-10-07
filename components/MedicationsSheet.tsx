@@ -315,6 +315,7 @@ export default function MedicationsSheet({ visible, date, today, onClose, onFeed
                   setDose(t);
                   setDoseError(false);
                 }}
+                keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'numeric'}
                 maxLength={MEDICATION_LIMITS.dose}
                 placeholder="e.g. 400"
                 placeholderTextColor={colors.textSecondary}
@@ -409,6 +410,8 @@ export default function MedicationsSheet({ visible, date, today, onClose, onFeed
             value={note}
             onChangeText={setNote}
             maxLength={MEDICATION_LIMITS.note}
+            multiline
+            textAlignVertical="top"
             placeholder="e.g. taken after food"
             placeholderTextColor={colors.textSecondary}
             style={styles.input}

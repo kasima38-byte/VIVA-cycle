@@ -4,7 +4,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Animated, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import DailyHeroCard from '../components/DailyHeroCard';
 import DailyTrackingSheet, { SheetField } from '../components/DailyTrackingSheet';
@@ -24,7 +24,8 @@ import { addDays, dateToKey, keyToLocalDate } from '../constants/dateUtils';
 import { colors, radius, spacing } from '../constants/theme';
 import {
   TRACKED_FIELDS, TrackedField, fieldFullText, fieldSummary, formatLongDate, formatMonthDay,
-  isTracked, relativeDayName, saveButtonLabel, trackedCount,
+  isTracked, relativeDayName, saveButtonLabel, trackedCount, dateHeader, savedMessage, FUTURE_DATE_MESSAGE,
+  energyLabel,
 } from '../lib/dailyTracking';
 import { SaveResult } from '../lib/dailyTrackingService';
 import { useDailyTracking } from '../lib/useDailyTracking';
@@ -109,6 +110,8 @@ export default function DailyTrackingScreen() {
     state, periodInfo, saveStatus, justSaved, dirty, saving, setField, save, flush, selectDate,
   } = useDailyTracking();
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
+  const oneColumn = screenWidth < 340; // very narrow phones: one card per row
   // Settings decide what is SHOWN - recorded data is never changed by them
   const { settings: trackingSettings } = useTrackingSettings();
   const showMood = isFieldVisible(trackingSettings, 'mood');
@@ -143,10 +146,15 @@ export default function DailyTrackingScreen() {
 
   const dateName = relativeDayName(selectedDate, today);
   const longDate = formatLongDate(selectedDate);
+  const header = dateHeader(selectedDate, today);
 
   const report = useCallback(
     (result: SaveResult | null, date: string) => {
       if (!result) return;
+      if (result === 'saved') {
+        show(savedMessage(date, today), 'success'); // "October 7 data saved"
+        return;
+      }
       const msg = resultMessage(result, dayPhrase(date, today));
       if (msg) show(msg.text, msg.tone);
     },
@@ -213,6 +221,10 @@ export default function DailyTrackingScreen() {
   };
 
   const openField = (field: TrackedField) => {
+    if (!canEdit) {
+      show(FUTURE_DATE_MESSAGE, 'info'); // explain instead of failing silently
+      return;
+    }
     if (field === 'mood' || field === 'energy') {
       const y = sectionY.current[field] - stickyHeight.current - spacing.md;
       scrollRef.current?.scrollTo({ y: Math.max(0, y), animated: true });
@@ -258,8 +270,18 @@ export default function DailyTrackingScreen() {
     periodInfo.status === 'period' && periodInfo.episode
       ? 'Period day ' + periodInfo.dayNumber + ', ' + recordedText(periodInfo.episode.recordedDays)
       : periodText;
-  const cardStatus = (f: TrackedField) => (f === 'period' ? periodText : fieldSummary(record, f));
-  const cardFullStatus = (f: TrackedField) => (f === 'period' ? periodFull : fieldFullText(record, f));
+  const cardStatus = (f: TrackedField) =>
+    f === 'period'
+      ? periodText
+      : f === 'energy' && record.energy !== null
+        ? record.energy + ' — ' + energyLabel(record.energy)
+        : fieldSummary(record, f);
+  const cardFullStatus = (f: TrackedField) =>
+    f === 'period'
+      ? periodFull
+      : f === 'energy' && record.energy !== null
+        ? record.energy + ' out of 100, ' + energyLabel(record.energy)
+        : fieldFullText(record, f);
 
   const dateItems: DateItem[] = visibleDates.map((key) => {
     const d = keyToLocalDate(key);
@@ -373,13 +395,19 @@ export default function DailyTrackingScreen() {
               onNext={() => handleSelect(addDays(selectedDate, 1))}
             />
             <View style={styles.dateLine}>
-              <Text
-                style={styles.dateText}
-                accessibilityLabel={'Selected date: ' + (dateName ? dateName + ', ' : '') + longDate}
+              <View
+                style={styles.dateTextWrap}
+                accessible
+                accessibilityRole="header"
+                accessibilityLabel={'Selected date: ' + (header.label ? header.label + ', ' : '') + header.full}
               >
-                {dateName ? <Text style={styles.dateName}>{dateName} · </Text> : null}
-                {longDate}
-              </Text>
+                {header.label ? (
+                  <Text style={[styles.dateLabel, header.label === 'Future date' && styles.dateLabelFuture]}>
+                    {header.label}
+                  </Text>
+                ) : null}
+                <Text style={styles.dateText}>{header.full}</Text>
+              </View>
               {relation !== 'today' && (
                 <Pressable
                   onPress={() => handleSelect(today)}
@@ -387,7 +415,7 @@ export default function DailyTrackingScreen() {
                   accessibilityRole="button"
                   accessibilityLabel="Go to today"
                 >
-                  <Text style={styles.todayLinkText}>Go to today</Text>
+                  <Text style={styles.todayLinkText}>Today</Text>
                 </Pressable>
               )}
             </View>
@@ -406,14 +434,14 @@ export default function DailyTrackingScreen() {
 
           <View style={styles.grid}>
             {CARDS.filter((c) => isFieldVisible(trackingSettings, c.field)).map((c) => (
-              <View key={c.field} style={styles.gridItem}>
+              <View key={c.field} style={[styles.gridItem, oneColumn && styles.gridItemFull]}>
                 <TrackingCard
                   icon={c.icon}
                   title={c.title}
                   status={cardStatus(c.field)}
                   fullStatus={cardFullStatus(c.field)}
                   tracked={isTracked(record, c.field)}
-                  disabled={!canEdit}
+                  muted={!canEdit}
                   onPress={() => openField(c.field)}
                 />
               </View>
@@ -619,6 +647,9 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.screen },
   safe: { flex: 1 },
   content: {
+    width: '100%',
+    maxWidth: 680, // tablets: keep cards and lines a readable width
+    alignSelf: 'center',
     paddingHorizontal: spacing.screenH,
     paddingBottom: spacing.xxl,
     gap: spacing.xl,
@@ -660,10 +691,20 @@ const styles = StyleSheet.create({
     minHeight: 32,
     gap: spacing.sm,
   },
-  dateText: {
+  dateTextWrap: {
     flex: 1,
-    fontSize: 15,
-    fontWeight: '600',
+  },
+  dateLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.magenta,
+  },
+  dateLabelFuture: {
+    color: colors.textSecondary,
+  },
+  dateText: {
+    fontSize: 16,
+    fontWeight: '700',
     color: colors.navy,
   },
   dateName: {
@@ -671,9 +712,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   todayLink: {
-    minHeight: 44,
+    minHeight: 40,
     justifyContent: 'center',
-    paddingHorizontal: spacing.xs,
+    paddingHorizontal: 14,
+    borderRadius: radius.pill,
+    backgroundColor: colors.pinkSoft,
   },
   todayLinkText: {
     fontSize: 14,
@@ -701,6 +744,9 @@ const styles = StyleSheet.create({
   },
   gridItem: {
     width: '48.5%',
+  },
+  gridItemFull: {
+    width: '100%',
   },
   moodCard: {
     backgroundColor: colors.pinkVerySoft,

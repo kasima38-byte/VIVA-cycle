@@ -10,9 +10,9 @@ type Props = {
   disabled?: boolean;
 };
 
-const TRACK_HEIGHT = 6;
-const THUMB = 26;
-const TOUCH_HEIGHT = 44; // comfortable touch target around the thin track
+const TRACK_HEIGHT = 8;
+const THUMB = 30;
+const TOUCH_HEIGHT = 48; // comfortable touch target around the track
 
 export default function EnergySlider({ value, onChange, disabled = false }: Props) {
   const width = useRef(0);
@@ -107,7 +107,9 @@ export default function EnergySlider({ value, onChange, disabled = false }: Prop
 
       <View style={styles.labelsRow}>
         <Text style={styles.labelText}>Very low</Text>
-        <Text style={[styles.labelText, tracked ? styles.labelActive : styles.labelUntracked]}>{label}</Text>
+        <Text style={[styles.labelText, tracked ? styles.labelActive : styles.labelUntracked]}>
+          {tracked ? percent + ' · ' + label : label}
+        </Text>
         <Text style={styles.labelText}>Very high</Text>
       </View>
     </View>

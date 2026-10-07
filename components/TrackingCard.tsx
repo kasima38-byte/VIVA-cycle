@@ -10,9 +10,12 @@ type Props = {
   tracked?: boolean;     // true when she has answered this one
   fullStatus?: string;   // complete value for screen readers (status may be shortened)
   disabled?: boolean;
+  muted?: boolean;       // future date: still tappable, so it can explain why it can't be recorded
 };
 
-export default function TrackingCard({ icon, title, status, onPress, tracked = false, fullStatus, disabled = false }: Props) {
+export default function TrackingCard({
+  icon, title, status, onPress, tracked = false, fullStatus, disabled = false, muted = false,
+}: Props) {
   return (
     <Pressable
       onPress={onPress}
@@ -22,10 +25,11 @@ export default function TrackingCard({ icon, title, status, onPress, tracked = f
         tracked && styles.cardTracked,
         pressed && styles.pressed,
         disabled && styles.disabled,
+        muted && styles.disabled,
       ]}
       accessibilityRole="button"
       accessibilityLabel={title + '. ' + (fullStatus ?? status) + '.'}
-      accessibilityHint={disabled ? undefined : 'Open ' + title.toLowerCase() + ' tracking'}
+      accessibilityHint={disabled ? undefined : muted ? 'This is a future date' : 'Open ' + title.toLowerCase() + ' tracking'}
       accessibilityState={{ disabled }}
     >
       <View style={styles.iconCircle}>
@@ -39,7 +43,13 @@ export default function TrackingCard({ icon, title, status, onPress, tracked = f
           {status}
         </Text>
       </View>
-      <Ionicons name="chevron-forward" size={18} color={colors.navy} />
+      {tracked ? (
+        <Ionicons name="chevron-forward" size={18} color={colors.navy} />
+      ) : (
+        <View style={styles.addPill}>
+          <Text style={styles.addText}>Add</Text>
+        </View>
+      )}
     </Pressable>
   );
 }
@@ -65,6 +75,17 @@ const styles = StyleSheet.create({
   },
   disabled: {
     opacity: 0.5,
+  },
+  addPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    backgroundColor: colors.pinkSoft,
+  },
+  addText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: colors.magenta,
   },
   iconCircle: {
     width: 40,

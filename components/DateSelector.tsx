@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   arrow: {
-    minWidth: 28,
+    minWidth: 40,
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',

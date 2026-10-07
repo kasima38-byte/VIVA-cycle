@@ -126,6 +126,8 @@ export default function MucusSheet({ visible, date, today, onClose, onFeedback }
             value={note}
             onChangeText={setNote}
             maxLength={MUCUS_NOTE_MAX}
+            multiline
+            textAlignVertical="top"
             placeholder="e.g. thicker than usual"
             placeholderTextColor={colors.textSecondary}
             style={styles.input}

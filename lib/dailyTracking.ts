@@ -309,3 +309,24 @@ export function saveButtonLabel(date: string, today: string): string {
   const d = keyToLocalDate(date);
   return 'Save ' + MONTHS[d.getMonth()].slice(0, 3) + ' ' + d.getDate() + ' Data';
 }
+
+// ---------- Date header and messages ----------
+
+/** "Wednesday, October 7, 2026" */
+export function formatFullDate(date: string): string {
+  const d = keyToLocalDate(date);
+  return WEEKDAYS[d.getDay()] + ', ' + MONTHS[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+}
+
+/** A small label (Today / Future date / none for past dates) above the full date. */
+export function dateHeader(date: string, today: string): { label: string | null; full: string } {
+  return { label: date === today ? 'Today' : date > today ? 'Future date' : null, full: formatFullDate(date) };
+}
+
+/** "Today's data saved" / "October 7 data saved" */
+export function savedMessage(date: string, today: string): string {
+  return date === today ? "Today's data saved" : formatMonthDay(date) + ' data saved';
+}
+
+export const FUTURE_DATE_MESSAGE =
+  "Daily tracking is for recorded observations. You can't record this information for a future date.";
