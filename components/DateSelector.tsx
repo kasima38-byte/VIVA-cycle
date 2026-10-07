@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useEffect, useRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { colors, radius, spacing } from '../constants/theme';
 
@@ -7,6 +8,9 @@ export type DateItem = {
   weekday: string;
   day: number;
   hasDot: boolean;
+  isToday?: boolean;
+  isFuture?: boolean;
+  label?: string; // full spoken name, e.g. "Today, Wednesday, October 7"
 };
 
 type Props = {
@@ -15,17 +19,38 @@ type Props = {
   onSelect: (key: string) => void;
   onPrev: () => void;
   onNext: () => void;
+  prevLabel?: string;
+  nextLabel?: string;
 };
 
-export default function DateSelector({ dates, selectedKey, onSelect, onPrev, onNext }: Props) {
+const ITEM_WIDTH = 46;
+
+export default function DateSelector({
+  dates, selectedKey, onSelect, onPrev, onNext, prevLabel = 'Previous day', nextLabel = 'Next day',
+}: Props) {
+  const scrollRef = useRef<ScrollView>(null);
+  const selectedIndex = dates.findIndex((d) => d.key === selectedKey);
+
+  // Keep the selected date in view on narrow phones
+  useEffect(() => {
+    if (selectedIndex >= 0) {
+      scrollRef.current?.scrollTo({ x: Math.max(0, (selectedIndex - 2) * ITEM_WIDTH), animated: true });
+    }
+  }, [selectedIndex]);
+
   return (
     <View style={styles.row}>
-      <Pressable onPress={onPrev} hitSlop={10} accessibilityRole="button" accessibilityLabel="Previous dates">
+      <Pressable onPress={onPrev} hitSlop={12} style={styles.arrow} accessibilityRole="button" accessibilityLabel={prevLabel}>
         <Ionicons name="chevron-back" size={20} color={colors.navy} />
       </Pressable>
 
       <View style={styles.pill}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+          ref={scrollRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
           {dates.map((date) => {
             const selected = date.key === selectedKey;
             return (
@@ -34,11 +59,23 @@ export default function DateSelector({ dates, selectedKey, onSelect, onPrev, onN
                 onPress={() => onSelect(date.key)}
                 style={styles.dayWrap}
                 accessibilityRole="button"
-                accessibilityLabel={`Select ${date.weekday} ${date.day}`}
+                accessibilityLabel={date.label ?? date.weekday + ' ' + date.day}
+                accessibilityHint={date.hasDot ? 'Has saved tracking' : undefined}
+                accessibilityState={{ selected }}
               >
-                <View style={[styles.dayCircle, selected && styles.dayCircleSelected]}>
-                  <Text style={[styles.weekday, selected && styles.textSelected]}>{date.weekday}</Text>
-                  <Text style={[styles.dayNum, selected && styles.textSelected]}>{date.day}</Text>
+                <View
+                  style={[
+                    styles.dayCircle,
+                    date.isToday && !selected && styles.dayCircleToday,
+                    selected && styles.dayCircleSelected,
+                  ]}
+                >
+                  <Text style={[styles.weekday, date.isFuture && !selected && styles.textFuture, selected && styles.textSelected]}>
+                    {date.weekday}
+                  </Text>
+                  <Text style={[styles.dayNum, date.isFuture && !selected && styles.textFuture, selected && styles.textSelected]}>
+                    {date.day}
+                  </Text>
                 </View>
                 <View style={styles.dotSlot}>{date.hasDot && !selected && <View style={styles.dot} />}</View>
               </Pressable>
@@ -47,7 +84,7 @@ export default function DateSelector({ dates, selectedKey, onSelect, onPrev, onN
         </ScrollView>
       </View>
 
-      <Pressable onPress={onNext} hitSlop={10} accessibilityRole="button" accessibilityLabel="Next dates">
+      <Pressable onPress={onNext} hitSlop={12} style={styles.arrow} accessibilityRole="button" accessibilityLabel={nextLabel}>
         <Ionicons name="chevron-forward" size={20} color={colors.navy} />
       </Pressable>
     </View>
@@ -59,6 +96,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+  },
+  arrow: {
+    minWidth: 28,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   pill: {
     flex: 1,
@@ -72,7 +115,7 @@ const styles = StyleSheet.create({
   },
   dayWrap: {
     alignItems: 'center',
-    width: 46,
+    width: ITEM_WIDTH,
   },
   dayCircle: {
     width: 44,
@@ -80,6 +123,10 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  dayCircleToday: {
+    borderWidth: 1.5,
+    borderColor: colors.magenta,
   },
   dayCircleSelected: {
     backgroundColor: colors.magenta,
@@ -94,6 +141,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.navy,
     marginTop: 1,
+  },
+  textFuture: {
+    opacity: 0.45,
   },
   textSelected: {
     color: colors.white,

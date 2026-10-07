@@ -7,24 +7,35 @@ type Props = {
   title: string;
   status: string;
   onPress?: () => void;
+  tracked?: boolean;     // true when she has answered this one
+  fullStatus?: string;   // complete value for screen readers (status may be shortened)
+  disabled?: boolean;
 };
 
-export default function TrackingCard({ icon, title, status, onPress }: Props) {
+export default function TrackingCard({ icon, title, status, onPress, tracked = false, fullStatus, disabled = false }: Props) {
   return (
     <Pressable
       onPress={onPress}
-      style={styles.card}
+      disabled={disabled}
+      style={({ pressed }) => [
+        styles.card,
+        tracked && styles.cardTracked,
+        pressed && styles.pressed,
+        disabled && styles.disabled,
+      ]}
       accessibilityRole="button"
-      accessibilityLabel={`Open ${title.toLowerCase()} tracking`}
+      accessibilityLabel={title + ': ' + (fullStatus ?? status)}
+      accessibilityHint={disabled ? undefined : 'Opens ' + title.toLowerCase() + ' options'}
+      accessibilityState={{ disabled }}
     >
       <View style={styles.iconCircle}>
         <Ionicons name={icon} size={20} color={colors.magenta} />
       </View>
       <View style={styles.textWrap}>
-        <Text style={styles.title} numberOfLines={1}>
+        <Text style={styles.title} numberOfLines={2}>
           {title}
         </Text>
-        <Text style={styles.status} numberOfLines={1}>
+        <Text style={[styles.status, tracked && styles.statusTracked]} numberOfLines={2}>
           {status}
         </Text>
       </View>
@@ -36,6 +47,7 @@ export default function TrackingCard({ icon, title, status, onPress }: Props) {
 const styles = StyleSheet.create({
   card: {
     flex: 1,
+    minHeight: 64,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.white,
@@ -44,6 +56,15 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     padding: spacing.sm,
     gap: 10,
+  },
+  cardTracked: {
+    borderColor: 'rgba(233,0,111,0.35)',
+  },
+  pressed: {
+    opacity: 0.8,
+  },
+  disabled: {
+    opacity: 0.5,
   },
   iconCircle: {
     width: 40,
@@ -65,5 +86,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textSecondary,
     marginTop: 1,
+  },
+  statusTracked: {
+    color: colors.navy,
+    fontWeight: '600',
   },
 });

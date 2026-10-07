@@ -1,38 +1,41 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../constants/theme';
+import { MOOD_OPTIONS, MoodValue } from '../lib/dailyTracking';
 
-export type MoodValue = 'veryLow' | 'low' | 'okay' | 'good' | 'great';
+export type { MoodValue };
 
-const moods: { key: MoodValue; label: string; icon: React.ComponentProps<typeof Ionicons>['name'] }[] = [
-  { key: 'veryLow', label: 'Very low', icon: 'sad' },
-  { key: 'low', label: 'Low', icon: 'sad-outline' },
-  { key: 'okay', label: 'Okay', icon: 'remove-circle-outline' },
-  { key: 'good', label: 'Good', icon: 'happy-outline' },
-  { key: 'great', label: 'Great', icon: 'happy' },
-];
-
-type Props = {
-  value: MoodValue;
-  onChange: (mood: MoodValue) => void;
+const ICONS: Record<MoodValue, React.ComponentProps<typeof Ionicons>['name']> = {
+  veryLow: 'sad',
+  low: 'sad-outline',
+  okay: 'remove-circle-outline',
+  good: 'happy-outline',
+  great: 'happy',
 };
 
-export default function MoodSelector({ value, onChange }: Props) {
+type Props = {
+  value: MoodValue | null; // null = not tracked (nothing highlighted)
+  onChange: (mood: MoodValue) => void;
+  disabled?: boolean;
+};
+
+export default function MoodSelector({ value, onChange, disabled = false }: Props) {
   return (
-    <View style={styles.row}>
-      {moods.map((mood) => {
-        const selected = mood.key === value;
+    <View style={[styles.row, disabled && styles.disabled]} accessibilityRole="radiogroup" accessibilityLabel="Mood">
+      {MOOD_OPTIONS.map((mood) => {
+        const selected = mood.value === value;
         return (
           <Pressable
-            key={mood.key}
-            onPress={() => onChange(mood.key)}
+            key={mood.value}
+            onPress={() => onChange(mood.value)}
+            disabled={disabled}
             style={styles.item}
-            accessibilityRole="button"
-            accessibilityLabel={`Select ${mood.label.toLowerCase()} mood`}
-            accessibilityState={{ selected }}
+            accessibilityRole="radio"
+            accessibilityLabel={mood.label + ' mood'}
+            accessibilityState={{ selected, checked: selected, disabled }}
           >
             <View style={[styles.circle, selected && styles.circleSelected]}>
-              <Ionicons name={mood.icon} size={22} color={colors.magenta} />
+              <Ionicons name={ICONS[mood.value]} size={22} color={colors.magenta} />
             </View>
             <Text style={[styles.label, selected && styles.labelSelected]}>{mood.label}</Text>
           </Pressable>
@@ -46,6 +49,9 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+  },
+  disabled: {
+    opacity: 0.5,
   },
   item: {
     alignItems: 'center',

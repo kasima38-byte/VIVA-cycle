@@ -11,14 +11,11 @@ import {
   CycleBaseline, DateStr, Goal, PeriodLog, PeriodLogResult,
   applyPeriodCorrection, applyPeriodLog, applyPeriodRemoval, createInitialLogs,
 } from './cycleEngine';
+import { DailyTrackingRecord, hasAnyData, normalizeRecord } from './dailyTracking';
+import { isValidDateKey } from '../constants/dateUtils';
 
-/** One day of Daily Tracking (her own entries). */
-export type DailyLog = {
-  date: string;
-  mood?: string;
-  energy?: number;
-  symptoms?: string[];
-};
+/** One day of Daily Tracking (her own entries). Full model: lib/dailyTracking.ts */
+export type DailyLog = DailyTrackingRecord;
 
 const STORAGE_KEY = 'viva-cycle:data';
 const BACKUP_KEY = 'viva-cycle:data-backup'; // last copy that was read successfully
@@ -84,23 +81,47 @@ export function useVivaStore(): VivaState {
 
 // ---------- Saving & loading ----------
 
-async function persist() {
-  if (!canSave) return;
+// Writes run one after another, so an older save can never land after a newer one.
+let writeChain: Promise<unknown> = Promise.resolve();
+
+/** Resolves true only once the data is really on the phone. */
+function persist(): Promise<boolean> {
+  if (!canSave) return Promise.resolve(false);
   const { loaded: _loaded, loadError: _loadError, ...data } = state;
-  try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  } catch (e) {
-    console.warn('VIVA: could not save data', e);
-  }
+  const json = JSON.stringify(data);
+  const write = writeChain.then(async () => {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, json);
+      return true;
+    } catch (e) {
+      console.warn('VIVA: could not save data', e);
+      return false;
+    }
+  });
+  writeChain = write;
+  return write;
 }
 
-function update(patch: Partial<VivaData>) {
+function update(patch: Partial<VivaData>): Promise<boolean> {
   state = { ...state, ...patch };
   emit();
-  void persist();
+  return persist();
 }
 
 let loading: Promise<void> | null = null;
+
+/** Clean every saved Daily Tracking day. The date KEY is the record's identity,
+ *  so one date can only ever hold one record. Older entries are upgraded. */
+function parseDailyLogs(raw: unknown): Record<string, DailyLog> {
+  const out: Record<string, DailyLog> = {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!isValidDateKey(key)) continue;
+    const record = normalizeRecord(key, value);
+    if (hasAnyData(record)) out[key] = record;
+  }
+  return out;
+}
 
 /** Parse saved JSON and keep only well-formed values. Throws if it is not a saved profile. */
 function parseSaved(raw: string): VivaData {
@@ -115,7 +136,7 @@ function parseSaved(raw: string): VivaData {
     ...saved,
     baseline: { ...EMPTY.baseline, ...(saved.baseline ?? {}) },
     periods: sortPeriods(periods),
-    dailyLogs: saved.dailyLogs && typeof saved.dailyLogs === 'object' && !Array.isArray(saved.dailyLogs) ? saved.dailyLogs : {},
+    dailyLogs: parseDailyLogs(saved.dailyLogs),
     reminders: saved.reminders && typeof saved.reminders === 'object' && !Array.isArray(saved.reminders) ? saved.reminders : {},
     version: SCHEMA_VERSION,
   };
@@ -218,10 +239,29 @@ export function setReminder(key: string, on: boolean) {
   update({ reminders: { ...state.reminders, [key]: on } });
 }
 
-/** Save one day of Daily Tracking (merged with anything already saved that day). */
-export function saveDailyLog(date: DateStr, patch: Partial<DailyLog>) {
-  const existing = state.dailyLogs[date] ?? { date };
-  update({ dailyLogs: { ...state.dailyLogs, [date]: { ...existing, ...patch, date } } });
+/** Replace one day's Daily Tracking record (never duplicated: the date is the key).
+ *  A day with every answer cleared is removed. Resolves true once it is on the phone. */
+export function putDailyLog(record: DailyLog): Promise<boolean> {
+  if (!canSave || !isValidDateKey(record.date)) return Promise.resolve(false);
+  const clean = normalizeRecord(record.date, record);
+  const dailyLogs = { ...state.dailyLogs };
+  if (hasAnyData(clean)) dailyLogs[clean.date] = { ...clean, updatedAt: new Date().toISOString() };
+  else delete dailyLogs[clean.date];
+  return update({ dailyLogs });
+}
+
+/** Merge a few answers into one day (kept for older callers). */
+export function saveDailyLog(date: DateStr, patch: Partial<DailyLog>): Promise<boolean> {
+  const existing = state.dailyLogs[date] ?? normalizeRecord(date, {});
+  return putDailyLog({ ...existing, ...patch, date });
+}
+
+/** Delete one day's Daily Tracking record. */
+export function removeDailyLog(date: DateStr): Promise<boolean> {
+  if (!canSave) return Promise.resolve(false);
+  if (!(date in state.dailyLogs)) return Promise.resolve(true);
+  const { [date]: _removed, ...rest } = state.dailyLogs;
+  return update({ dailyLogs: rest });
 }
 
 /** Settings change: affects future predictions only, never period history. */
