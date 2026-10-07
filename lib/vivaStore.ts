@@ -57,6 +57,10 @@ let state: VivaState = { ...EMPTY, loaded: false, loadError: false };
 // This stops a failed/corrupted read from leading to her history being overwritten.
 let canSave = false;
 
+// What is really on the phone (updated only after a successful write).
+// If a write fails, the screen goes back to this - nothing unsaved ever looks saved.
+let savedData: VivaData | null = null;
+
 // ---------- Subscriptions ----------
 
 const listeners = new Set<() => void>();
@@ -93,6 +97,7 @@ function persist(): Promise<boolean> {
   const write = writeChain.then(async () => {
     try {
       await AsyncStorage.setItem(STORAGE_KEY, json);
+      savedData = data;
       return true;
     } catch (e) {
       console.warn('VIVA: could not save data', e);
@@ -104,9 +109,17 @@ function persist(): Promise<boolean> {
 }
 
 function update(patch: Partial<VivaData>): Promise<boolean> {
-  state = { ...state, ...patch };
+  const after = { ...state, ...patch };
+  state = after;
   emit();
-  return persist();
+  return persist().then((ok) => {
+    // Failed write: show what is really saved again (unless a newer change already replaced it)
+    if (!ok && state === after && savedData) {
+      state = { ...state, ...savedData };
+      emit();
+    }
+    return ok;
+  });
 }
 
 /** Every change to daily records goes through here, so the period start list
@@ -207,6 +220,10 @@ export function loadVivaStore(): Promise<void> {
           state = { ...EMPTY, loaded: true, loadError: true };
           canSave = false;
         }
+      }
+      if (canSave) {
+        const { loaded: _l, loadError: _e, ...data } = state;
+        savedData = data;
       }
       emit();
     })();
@@ -352,6 +369,7 @@ export function setDateOfBirth(dateOfBirth: DateStr | null) {
 export async function resetVivaStore() {
   state = { ...EMPTY, loaded: true, loadError: false };
   canSave = true;
+  savedData = { ...EMPTY };
   emit();
   try {
     await AsyncStorage.removeItem(STORAGE_KEY);

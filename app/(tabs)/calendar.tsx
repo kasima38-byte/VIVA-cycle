@@ -1,3 +1,4 @@
+import { sexualActivityDates } from '../../lib/sexualActivity';
 import { mucusByDate } from '../../lib/mucusTracking';
 import { bleedingMarks } from '../../lib/periodTracking';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,7 +33,7 @@ export default function CalendarScreen() {
   );
 
   // Sexual activity is not an approved VIVA feature: no markers are drawn
-  const sexDates: string[] = [];
+  const sexDates: string[] = sexualActivityDates(viva.dailyLogs); // recorded activity only - one source
 
   const [year, setYear] = useState(todayDate.getFullYear());
   const [monthIndex, setMonthIndex] = useState(todayDate.getMonth());

@@ -11,6 +11,7 @@ import {
   DailyTrackingRecord, TrackedField, canLog, emptyRecord, normalizeRecord, sameTrackedData,
 } from './dailyTracking';
 import { getVivaState, putDailyLog, removeDailyLog } from './vivaStore';
+import { PeriodResult, removePeriodDay } from './periodService';
 
 export type SaveResult =
   | 'saved'      // written to the phone
@@ -71,4 +72,49 @@ export async function updateDailyRecord(date: string, changes: DailyRecordChange
 export async function deleteDailyRecord(date: string): Promise<boolean> {
   if (!isValidDateKey(date)) return false;
   return removeDailyLog(date);
+}
+
+// ---------- Field-level updates ----------
+// Every change follows: READ -> MERGE ONE FIELD -> VALIDATE -> PERSIST -> UPDATE UI.
+// Never replace a whole record with partial data.
+//
+// EMPTY RULE (every field, lists included): null = not tracked.
+// A day with nothing tracked is not stored at all; clearing one field never removes the others.
+
+export type FieldValueField = Exclude<TrackedField, 'period'>;
+
+function withoutStamp(r: DailyTrackingRecord) {
+  const { updatedAt: _u, ...rest } = r;
+  return rest;
+}
+
+/** Change ONE field for one date; every other field is preserved.
+ *  Period days span several dates, so they go through lib/periodService.ts instead. */
+export async function updateDailyTrackingField<F extends FieldValueField>(
+  date: string, field: F, value: DailyTrackingRecord[F]
+): Promise<SaveResult> {
+  if ((field as string) === 'period') return 'invalid';
+  if (!isValidDateKey(date)) return 'invalid';
+  if (!canLog(date, getToday())) return 'future';
+  const existing = readDailyRecord(date);
+  const merged = normalizeRecord(date, { ...existing, [field]: value });
+  if (value !== null && merged[field] === null) return 'invalid'; // value not accepted
+  if (JSON.stringify(withoutStamp(existing)) === JSON.stringify(withoutStamp(merged))) return 'unchanged';
+  return (await putDailyLog(merged)) ? 'saved' : 'failed';
+}
+
+/** Return one field to "not tracked". Other fields on that day are kept. */
+export async function clearDailyRecordField(date: string, field: TrackedField): Promise<SaveResult | PeriodResult> {
+  if (field === 'period') return removePeriodDay(date);
+  return updateDailyTrackingField(date, field, null);
+}
+
+/** Saved records between two dates (inclusive), oldest first. */
+export function getRecordsForDateRange(start: string, end: string): DailyTrackingRecord[] {
+  if (!isValidDateKey(start) || !isValidDateKey(end) || end < start) return [];
+  const logs = getVivaState().dailyLogs;
+  return Object.keys(logs)
+    .filter((d) => d >= start && d <= end)
+    .sort()
+    .map((d) => normalizeRecord(d, logs[d]));
 }

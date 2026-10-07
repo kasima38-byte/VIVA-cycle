@@ -303,5 +303,6 @@ export function relativeDayName(date: string, today: string): string | null {
 export function saveButtonLabel(date: string, today: string): string {
   const name = relativeDayName(date, today);
   if (name === 'Today' || name === 'Yesterday') return 'Save ' + name + "'s Data";
-  return 'Save ' + formatMonthDay(date) + "'s Data";
+  const d = keyToLocalDate(date);
+  return 'Save ' + MONTHS[d.getMonth()].slice(0, 3) + ' ' + d.getDate() + ' Data';
 }

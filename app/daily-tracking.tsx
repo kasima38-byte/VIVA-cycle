@@ -104,13 +104,18 @@ function useToast() {
 export default function DailyTrackingScreen() {
   const {
     today, selectedDate, relation, canEdit, visibleDates, loggedDates, record, savedAt,
-    state, periodInfo, saveStatus, dirty, saving, setField, save, flush, selectDate,
+    state, periodInfo, saveStatus, justSaved, dirty, saving, setField, save, flush, selectDate,
   } = useDailyTracking();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { toast, opacity, show } = useToast();
 
   const [sheet, setSheet] = useState<SheetField | null>(null);
+  type NavAction = Parameters<typeof navigation.dispatch>[0];
+  // A save failed while switching dates or leaving: offer Retry instead of moving silently
+  const [blocked, setBlocked] = useState<
+    { kind: 'date'; target: string } | { kind: 'leave'; action: NavAction } | null
+  >(null);
   const [periodOpen, setPeriodOpen] = useState(false);
   const [flowOpen, setFlowOpen] = useState(false);
   const [symptomsOpen, setSymptomsOpen] = useState(false);
@@ -133,14 +138,13 @@ export default function DailyTrackingScreen() {
     [show, today]
   );
 
-  // Switching dates: unsaved changes are saved first (and confirmed)
+  // Switching dates: pending changes are saved first. If that fails she stays here, with Retry.
   const handleSelect = useCallback(
     async (date: string) => {
-      const from = selectedDate;
       const result = await selectDate(date);
-      if (result === 'saved' || result === 'failed') report(result, from);
+      setBlocked(result === 'failed' ? { kind: 'date', target: date } : null);
     },
-    [selectedDate, selectDate, report]
+    [selectDate]
   );
 
   const handleSave = async () => {
@@ -159,15 +163,39 @@ export default function DailyTrackingScreen() {
         e.preventDefault();
         flush().then((result) => {
           if (result === 'failed') {
-            report(result, selectedDate);
+            setBlocked({ kind: 'leave', action: e.data.action });
             return;
           }
           leavingRef.current = true;
           navigation.dispatch(e.data.action);
         });
       }),
-    [navigation, flush, report, selectedDate]
+    [navigation, flush]
   );
+
+  const retryBlocked = async () => {
+    const b = blocked;
+    if (!b) return;
+    const result = await save();
+    if (result === 'failed') return; // banner stays; nothing is lost
+    setBlocked(null);
+    if (b.kind === 'date') {
+      await handleSelect(b.target);
+    } else {
+      leavingRef.current = true;
+      navigation.dispatch(b.action);
+    }
+  };
+
+  // "Stay on this date" keeps her input here; "Leave without saving" is her explicit choice
+  const dismissBlocked = () => {
+    const b = blocked;
+    setBlocked(null);
+    if (b?.kind === 'leave') {
+      leavingRef.current = true;
+      navigation.dispatch(b.action);
+    }
+  };
 
   const openField = (field: TrackedField) => {
     if (field === 'mood' || field === 'energy') {
@@ -255,6 +283,8 @@ export default function DailyTrackingScreen() {
   let status: { icon: IconName; text: string; color: string; iconColor: string };
   if (!canEdit) {
     status = { icon: 'time-outline', text: "Future dates can't be tracked yet", color: colors.textSecondary, iconColor: colors.textSecondary };
+  } else if (saveStatus === 'error') {
+    status = { icon: 'alert-circle', text: "Couldn't save your changes.", color: colors.magenta, iconColor: colors.magenta };
   } else if (saving) {
     status = { icon: 'sync-outline', text: 'Saving…', color: colors.textSecondary, iconColor: colors.textSecondary };
   } else if (saveStatus === 'unsaved') {
@@ -266,7 +296,10 @@ export default function DailyTrackingScreen() {
   }
 
   const buttonLabel = saveButtonLabel(selectedDate, today);
-  const buttonDisabled = !canEdit || saving || !dirty;
+  const buttonDisabled = !canEdit || saving || (!dirty && saveStatus !== 'error');
+  const buttonText =
+    saveStatus === 'error' ? 'Try Again' : saving ? 'Saving…' : justSaved && !dirty ? 'Saved' : buttonLabel;
+  const showCheck = canEdit && !dirty && saveStatus === 'saved';
 
   return (
     <View style={styles.root}>
@@ -446,6 +479,32 @@ export default function DailyTrackingScreen() {
           </Animated.View>
         )}
 
+        {blocked && (
+          <View style={styles.banner} accessibilityLiveRegion="assertive">
+            <Text style={styles.bannerText}>Your changes couldn't be saved.</Text>
+            <View style={styles.bannerActions}>
+              <Pressable
+                onPress={() => void retryBlocked()}
+                style={styles.bannerButton}
+                accessibilityRole="button"
+                accessibilityLabel="Retry saving"
+              >
+                <Text style={styles.bannerButtonText}>Retry</Text>
+              </Pressable>
+              <Pressable
+                onPress={dismissBlocked}
+                style={styles.bannerLink}
+                accessibilityRole="button"
+                accessibilityLabel={blocked.kind === 'date' ? 'Stay on this date' : 'Leave without saving'}
+              >
+                <Text style={styles.bannerLinkText}>
+                  {blocked.kind === 'date' ? 'Stay on this date' : 'Leave without saving'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+
         <View style={styles.statusRow} accessibilityLabel={status.text}>
           <Ionicons name={status.icon} size={status.icon === 'ellipse' ? 9 : 15} color={status.iconColor} />
           <Text style={[styles.statusText, { color: status.color }]}>{status.text}</Text>
@@ -464,11 +523,11 @@ export default function DailyTrackingScreen() {
           accessibilityHint={buttonDisabled && canEdit && !saving ? 'No new changes to save' : undefined}
           accessibilityState={{ disabled: buttonDisabled, busy: saving }}
         >
-          {saveStatus === 'saved' && !dirty && canEdit && (
+          {showCheck && (
             <Ionicons name="checkmark-circle" size={20} color={colors.magenta} />
           )}
           <Text style={[styles.saveButtonText, buttonDisabled && styles.saveButtonTextDisabled]}>
-            {saving ? 'Saving…' : buttonLabel}
+            {buttonText}
           </Text>
         </Pressable>
       </View>
@@ -634,6 +693,26 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 3,
   },
+  banner: {
+    backgroundColor: colors.pinkVerySoft,
+    borderWidth: 1,
+    borderColor: colors.magenta,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  bannerText: { fontSize: 14.5, fontWeight: '700', color: colors.navy },
+  bannerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  bannerButton: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.pill,
+    backgroundColor: colors.magenta,
+  },
+  bannerButtonText: { fontSize: 14.5, fontWeight: '700', color: colors.white },
+  bannerLink: { minHeight: 44, justifyContent: 'center' },
+  bannerLinkText: { fontSize: 14, fontWeight: '700', color: colors.magenta },
   clearLink: {
     alignSelf: 'flex-start',
     minHeight: 44,

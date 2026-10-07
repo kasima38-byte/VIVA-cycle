@@ -2,8 +2,10 @@
 //
 //   UI (app/daily-tracking.tsx) -> THIS HOOK -> lib/dailyTrackingService.ts -> lib/vivaStore.ts
 //
-// Her taps change a DRAFT for the selected date. Saving writes the draft through the service.
-// The selected date controls everything: the draft always belongs to selectedDate.
+// Mood and Energy change a DRAFT for the selected date and AUTOSAVE: mood at once, energy
+// shortly after she stops dragging. Every other field is saved by its own sheet, so the draft
+// always shows those saved values. The Save button is a final "save anything pending" point.
+// If a write fails, her input stays in the draft so she can try again.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
@@ -18,11 +20,15 @@ import { useToday } from './useToday';
 import { useVivaStore } from './vivaStore';
 
 const WINDOW_DAYS = 7;
+const ENERGY_AUTOSAVE_MS = 700; // after she stops dragging
+const SAVED_FLASH_MS = 2000;    // how long the button says "Saved"
 
 /** notSaved: nothing saved for this day and no changes
- *  unsaved:  she has changes that are not saved yet
- *  saved:    what she sees is exactly what is saved */
-export type SaveStatus = 'notSaved' | 'unsaved' | 'saved';
+ *  unsaved:  changes not saved yet (autosave is about to run)
+ *  saving:   writing to the phone
+ *  saved:    what she sees is exactly what is saved
+ *  error:    the last write failed - her input is kept for Try Again */
+export type SaveStatus = 'notSaved' | 'unsaved' | 'saving' | 'saved' | 'error';
 
 /** Slide the 7-day strip only when the date would fall off its edge. */
 function keepVisible(windowStart: string, date: string): string {
@@ -40,13 +46,14 @@ export function useDailyTracking() {
   const [windowStart, setWindowStart] = useState(() => addDays(today, -3));
   const [draft, setDraft] = useState<DailyTrackingRecord>(() => readDailyRecord(today));
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const saved = useMemo(() => readDailyRecord(selectedDate), [selectedDate, dailyLogs]);
 
-  // Never show another date's answers, even for a single frame
-  // Period, flow and symptoms are saved directly by their own sheets,
-  // so their cards always show the saved values
+  // Never show another date's answers, even for a single frame.
+  // Fields with their own sheets always show their saved values.
   const base = draft.date === selectedDate ? draft : saved;
   const record = useMemo(
     () => ({
@@ -69,13 +76,16 @@ export function useDailyTracking() {
   const todayRef = useRef(today);
   todayRef.current = today;
   const inFlight = useRef<Promise<SaveResult> | null>(null);
+  const delayRef = useRef(0);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // If this day's saved record changes elsewhere while she has no edits, show it
+  // If this day's saved record changes elsewhere while she has no edits, show it.
+  // While our own save is running (or being undone after a failure), keep her input.
   const lastSaved = useRef(saved);
   useEffect(() => {
     const prev = lastSaved.current;
     lastSaved.current = saved;
-    if (prev.date !== saved.date) return;
+    if (prev.date !== saved.date || inFlight.current) return;
     setDraft((d) => (d.date === saved.date && sameTrackedData(d, prev) ? saved : d));
   }, [saved]);
 
@@ -83,7 +93,15 @@ export function useDailyTracking() {
   const canEdit = canLog(selectedDate, today);
   const dirty = !sameTrackedData(record, saved);
   const hasSaved = Object.prototype.hasOwnProperty.call(dailyLogs, selectedDate);
-  const saveStatus: SaveStatus = dirty ? 'unsaved' : hasSaved ? 'saved' : 'notSaved';
+  const saveStatus: SaveStatus = saving
+    ? 'saving'
+    : saveError && dirty
+      ? 'error'
+      : dirty
+        ? 'unsaved'
+        : hasSaved
+          ? 'saved'
+          : 'notSaved';
   const state: TrackingState = trackingState(record);
   const periodInfo = useMemo(() => periodInfoOn(dailyLogs, selectedDate), [dailyLogs, selectedDate]);
 
@@ -93,14 +111,25 @@ export function useDailyTracking() {
     [windowStart]
   );
 
-  /** Save the shown draft. A second tap while saving returns the same save. */
+  /** Save the shown draft. A second call while saving returns the same save. */
   const save = useCallback((): Promise<SaveResult> => {
     if (inFlight.current) return inFlight.current;
     const toSave = draftRef.current;
     const p = (async () => {
       setSaving(true);
       try {
-        return await saveDailyRecord(toSave);
+        const result = await saveDailyRecord(toSave);
+        if (result === 'failed') {
+          setSaveError(true);
+        } else {
+          setSaveError(false);
+          if (result === 'saved') {
+            setJustSaved(true);
+            if (flashTimer.current) clearTimeout(flashTimer.current);
+            flashTimer.current = setTimeout(() => setJustSaved(false), SAVED_FLASH_MS);
+          }
+        }
+        return result;
       } finally {
         setSaving(false);
         inFlight.current = null;
@@ -118,15 +147,17 @@ export function useDailyTracking() {
     return save();
   }, [save]);
 
-  /** Switch dates: save unsaved changes first, then load that date's own record. */
+  /** Switch dates: save pending changes first, then load that date's own record.
+   *  If saving fails she stays on this date (the screen offers Retry). */
   const selectDate = useCallback(
     async (date: string): Promise<SaveResult | null> => {
       if (!isValidDateKey(date) || date === selectedRef.current) return null;
       const result = await flush();
-      if (result === 'failed') return result; // stay here so nothing is lost
+      if (result === 'failed') return result;
       selectedRef.current = date;
       setSelectedDate(date);
       setDraft(readDailyRecord(date));
+      setSaveError(false);
       setWindowStart((ws) => keepVisible(ws, date));
       return result;
     },
@@ -137,21 +168,41 @@ export function useDailyTracking() {
   const goNext = useCallback(() => selectDate(addDays(selectedRef.current, 1)), [selectDate]);
   const goToday = useCallback(() => selectDate(todayRef.current), [selectDate]);
 
-  /** Change one answer in the draft. Ignored for future dates. */
+  /** Change one draft answer (Mood / Energy). Ignored for future dates. Autosaves. */
   const setField = useCallback(<F extends TrackedField>(field: F, value: DailyTrackingRecord[F]) => {
+    delayRef.current = field === 'energy' ? ENERGY_AUTOSAVE_MS : 0;
+    setSaveError(false); // a new change gets a fresh attempt
     setDraft((d) => {
-      const base = d.date === selectedRef.current ? d : readDailyRecord(selectedRef.current);
-      return canLog(base.date, todayRef.current) ? { ...base, [field]: value } : base;
+      const b = d.date === selectedRef.current ? d : readDailyRecord(selectedRef.current);
+      return canLog(b.date, todayRef.current) ? { ...b, [field]: value } : b;
     });
   }, []);
 
-  // App going to the background: keep her changes
+  // AUTOSAVE: when there are pending changes, save after the field's delay.
+  // A newer change restarts the wait, so the latest value always wins. After a failure it
+  // waits for Try Again or a new change instead of retrying in a loop.
+  useEffect(() => {
+    if (!dirty || !canEdit || saving || saveError) return;
+    const t = setTimeout(() => {
+      void save();
+    }, delayRef.current);
+    return () => clearTimeout(t);
+  }, [record, dirty, canEdit, saving, saveError, save]);
+
+  // App going to the background: save anything pending
   useEffect(() => {
     const sub = AppState.addEventListener('change', (s) => {
       if (s !== 'active') void flush();
     });
     return () => sub.remove();
   }, [flush]);
+
+  useEffect(
+    () => () => {
+      if (flashTimer.current) clearTimeout(flashTimer.current);
+    },
+    []
+  );
 
   return {
     today,
@@ -160,11 +211,12 @@ export function useDailyTracking() {
     canEdit,
     visibleDates,
     loggedDates,
-    record,            // what the cards show (the draft for selectedDate)
+    record,            // what the cards show
     savedAt: saved.updatedAt,
     state,             // 'empty' | 'partial' | 'complete'
     periodInfo,        // bleeding status, episode and day number for selectedDate
-    saveStatus,        // 'notSaved' | 'unsaved' | 'saved'
+    saveStatus,        // 'notSaved' | 'unsaved' | 'saving' | 'saved' | 'error'
+    justSaved,         // true for a moment after a successful save
     dirty,
     saving,
     setField,
