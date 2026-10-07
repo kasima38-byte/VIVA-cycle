@@ -24,8 +24,8 @@ export default function TrackingCard({ icon, title, status, onPress, tracked = f
         disabled && styles.disabled,
       ]}
       accessibilityRole="button"
-      accessibilityLabel={title + ': ' + (fullStatus ?? status)}
-      accessibilityHint={disabled ? undefined : 'Opens ' + title.toLowerCase() + ' options'}
+      accessibilityLabel={title + '. ' + (fullStatus ?? status) + '.'}
+      accessibilityHint={disabled ? undefined : 'Open ' + title.toLowerCase() + ' tracking'}
       accessibilityState={{ disabled }}
     >
       <View style={styles.iconCircle}>

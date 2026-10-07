@@ -14,7 +14,8 @@ import {
   MedicationInput, MedicationResult, addMedication, clearMedications, deleteMedication, updateMedication,
 } from '../lib/medicationService';
 import {
-  MEDICATION_LIMITS, MedicationEntry, UNIT_SUGGESTIONS, describeMedication, formatDose, formatTime, timeFromDate,
+  MEDICATION_LIMITS, MedicationEntry, UNIT_SUGGESTIONS, describeMedication, formatDose, formatTime, isValidDose,
+  timeFromDate,
 } from '../lib/medications';
 import { useVivaStore } from '../lib/vivaStore';
 import BottomSheet from './BottomSheet';
@@ -53,6 +54,7 @@ export default function MedicationsSheet({ visible, date, today, onClose, onFeed
   const [note, setNote] = useState('');
   const [showPicker, setShowPicker] = useState(false);
   const [nameError, setNameError] = useState(false);
+  const [doseError, setDoseError] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
@@ -84,6 +86,7 @@ export default function MedicationsSheet({ visible, date, today, onClose, onFeed
     setNote(e?.note ?? '');
     setShowPicker(false);
     setNameError(false);
+    setDoseError(false);
     setError(null);
     setFlash(null);
     setMode('form');
@@ -101,6 +104,7 @@ export default function MedicationsSheet({ visible, date, today, onClose, onFeed
     if (result === 'saved') done(message);
     else if (result === 'unchanged') setMode('list');
     else if (result === 'missingName') setNameError(true);
+    else if (result === 'invalidDose') setDoseError(true);
     else setError(ERRORS[result] ?? "Couldn't save. Please try again.");
   };
 
@@ -108,6 +112,10 @@ export default function MedicationsSheet({ visible, date, today, onClose, onFeed
     if (busy) return;
     if (!name.trim()) {
       setNameError(true);
+      return;
+    }
+    if (!isValidDose(dose)) {
+      setDoseError(true);
       return;
     }
     setBusy(true);
@@ -303,7 +311,10 @@ export default function MedicationsSheet({ visible, date, today, onClose, onFeed
               <Text style={styles.fieldLabel}>Dose (optional)</Text>
               <TextInput
                 value={dose}
-                onChangeText={setDose}
+                onChangeText={(t) => {
+                  setDose(t);
+                  setDoseError(false);
+                }}
                 maxLength={MEDICATION_LIMITS.dose}
                 placeholder="e.g. 400"
                 placeholderTextColor={colors.textSecondary}
@@ -325,6 +336,11 @@ export default function MedicationsSheet({ visible, date, today, onClose, onFeed
               />
             </View>
           </View>
+          {doseError && (
+            <Text style={styles.fieldError} accessibilityLiveRegion="assertive">
+              Enter the dose as a number, e.g. 400 or 1.5.
+            </Text>
+          )}
           <View style={styles.chips}>
             {UNIT_SUGGESTIONS.map((u) => (
               <Pressable

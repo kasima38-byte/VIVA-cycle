@@ -4,7 +4,8 @@
 
 import { getToday, isValidDateKey } from '../constants/dateUtils';
 import {
-  MEDICATION_LIMITS, MedicationEntry, medicationFrequency, newMedicationId, normalizeMedicationEntry, normalizeTime,
+  MEDICATION_LIMITS, MedicationEntry, isValidDose, medicationFrequency, newMedicationId, normalizeMedicationEntry,
+  normalizeTime,
 } from './medications';
 import { getVivaState, saveDailyLog } from './vivaStore';
 
@@ -14,6 +15,7 @@ export type MedicationResult =
   | 'future'       // can only be recorded for today or earlier
   | 'invalid'      // not a real date, or a time that isn't "HH:MM"
   | 'missingName'  // a medication name is required
+  | 'invalidDose'  // a dose was entered but isn't a number (e.g. "400", "1.5", "1-2")
   | 'notFound'     // no entry with that ID on this date
   | 'tooMany'      // more than the daily limit
   | 'failed';      // the phone could not save
@@ -36,8 +38,9 @@ function checkDate(date: string): MedicationResult | null {
   return null;
 }
 
-function toEntry(id: string, input: MedicationInput): MedicationEntry | 'missingName' | 'invalid' {
+function toEntry(id: string, input: MedicationInput): MedicationEntry | 'missingName' | 'invalidDose' | 'invalid' {
   if (input.time && normalizeTime(input.time) === null) return 'invalid';
+  if (!isValidDose(input.dose)) return 'invalidDose';
   return normalizeMedicationEntry({ ...input, id }, id) ?? 'missingName';
 }
 

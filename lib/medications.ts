@@ -31,6 +31,16 @@ function cleanText(v: unknown, max: number): string | null {
   return t.length > 0 ? t : null;
 }
 
+/** A dose is optional. If entered it must be a number or simple range:
+ *  "400", "1.5", "0,5", "1-2", "½", "1½". Units go in their own field. */
+export function isValidDose(v: string | null | undefined): boolean {
+  if (v == null) return true;
+  const t = v.trim();
+  if (t === '') return true;
+  const num = '(\\d+([.,]\\d+)?|\\d*[½¼¾])';
+  return new RegExp('^' + num + '(\\s*[-–]\\s*' + num + ')?$').test(t);
+}
+
 export function normalizeTime(v: unknown): string | null {
   return typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : null;
 }

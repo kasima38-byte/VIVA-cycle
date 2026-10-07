@@ -110,6 +110,15 @@ export default function DailyTrackingScreen() {
   const navigation = useNavigation();
   const { toast, opacity, show } = useToast();
 
+  // The first thing recorded for a date gets one quiet confirmation (not every change)
+  const hasRecord = loggedDates.has(selectedDate);
+  const recordSeen = useRef({ date: selectedDate, has: hasRecord });
+  useEffect(() => {
+    const prev = recordSeen.current;
+    recordSeen.current = { date: selectedDate, has: hasRecord };
+    if (prev.date === selectedDate && !prev.has && hasRecord) show('Tracking saved', 'success');
+  }, [selectedDate, hasRecord, show]);
+
   const [sheet, setSheet] = useState<SheetField | null>(null);
   type NavAction = Parameters<typeof navigation.dispatch>[0];
   // A save failed while switching dates or leaving: offer Retry instead of moving silently
@@ -272,9 +281,9 @@ export default function DailyTrackingScreen() {
     relation === 'future'
       ? 'You can track this day when it arrives.'
       : state === 'complete'
-        ? 'Everything tracked. Well done!'
+        ? 'All ' + TRACKED_FIELDS.length + ' categories tracked.'
         : state === 'partial'
-          ? count + ' of ' + TRACKED_FIELDS.length + ' tracked. Add more any time.'
+          ? count + ' of ' + TRACKED_FIELDS.length + ' categories tracked'
           : relation === 'today'
             ? 'How are you feeling today?'
             : 'How were you feeling that day?';
