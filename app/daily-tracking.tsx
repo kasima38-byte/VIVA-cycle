@@ -363,8 +363,24 @@ export default function DailyTrackingScreen() {
               {relation === 'today' ? 'How are you feeling overall?' : 'How were you feeling overall?'}
             </Text>
             <View style={{ marginTop: spacing.md }}>
-              <MoodSelector value={record.mood} onChange={(m) => setField('mood', m)} disabled={!canEdit} />
+              <MoodSelector
+                value={record.mood}
+                onChange={(m) => setField('mood', m)}
+                disabled={!canEdit}
+                dayLabel={relation === 'today' ? "today's" : "this day's"}
+              />
             </View>
+            {record.mood !== null && canEdit && (
+              <Pressable
+                onPress={() => setField('mood', null)}
+                style={styles.clearLink}
+                accessibilityRole="button"
+                accessibilityLabel="Clear mood"
+                accessibilityHint="Sets mood back to not tracked"
+              >
+                <Text style={styles.clearLinkText}>Clear mood</Text>
+              </Pressable>
+            )}
           </View>
 
           <View
@@ -564,6 +580,17 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     color: colors.textSecondary,
     marginTop: 3,
+  },
+  clearLink: {
+    alignSelf: 'flex-start',
+    minHeight: 44,
+    justifyContent: 'center',
+    marginTop: spacing.xs,
+  },
+  clearLinkText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.magenta,
   },
   footer: {
     paddingHorizontal: spacing.screenH,

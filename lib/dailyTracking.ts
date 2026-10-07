@@ -14,7 +14,7 @@ import { SYMPTOMS, normalizeSymptomIds } from './symptoms';
 
 export type PeriodStatus = 'yes' | 'no';
 export type FlowValue = 'none' | 'spotting' | 'light' | 'medium' | 'heavy';
-export type MoodValue = 'veryLow' | 'low' | 'okay' | 'good' | 'great';
+export type MoodValue = 'very_low' | 'low' | 'okay' | 'good' | 'great';
 export type MucusValue = 'dry' | 'sticky' | 'creamy' | 'watery' | 'eggWhite';
 export type SexualActivityValue = 'none' | 'protected' | 'unprotected';
 
@@ -55,7 +55,7 @@ export const FLOW_OPTIONS: Option<FlowValue>[] = [
 ];
 
 export const MOOD_OPTIONS: Option<MoodValue>[] = [
-  { value: 'veryLow', label: 'Very low' },
+  { value: 'very_low', label: 'Very low' },
   { value: 'low', label: 'Low' },
   { value: 'okay', label: 'Okay' },
   { value: 'good', label: 'Good' },
@@ -149,7 +149,7 @@ export function normalizeRecord(date: string, raw: unknown): DailyTrackingRecord
     period: oneOf(PERIOD_OPTIONS, r.period),
     flow: oneOf(FLOW_OPTIONS, r.flow),
     symptoms: symptomList(r.symptoms),
-    mood: oneOf(MOOD_OPTIONS, r.mood),
+    mood: oneOf(MOOD_OPTIONS, r.mood === 'veryLow' ? 'very_low' : r.mood), // 'veryLow' = earlier ID
     energy,
     cervicalMucus: oneOf(MUCUS_OPTIONS, r.cervicalMucus),
     sexualActivity: oneOf(SEXUAL_ACTIVITY_OPTIONS, r.sexualActivity),

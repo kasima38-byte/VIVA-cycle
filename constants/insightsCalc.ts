@@ -58,7 +58,7 @@ export function calculateCommonSymptoms(records: CycleRecord[], top = 3): string
     .map(([name]) => name.charAt(0).toUpperCase() + name.slice(1));
 }
 
-const MOOD_SCORE: Record<string, number> = { veryLow: 1, low: 2, okay: 3, good: 4, great: 5 };
+const MOOD_SCORE: Record<string, number> = { very_low: 1, low: 2, okay: 3, good: 4, great: 5 };
 
 export function calculateMoodPattern(records: CycleRecord[]): string {
   const scores = records.flatMap((r) => r.moods.map((m) => MOOD_SCORE[m] ?? 3));
