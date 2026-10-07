@@ -9,13 +9,15 @@
 
 import { addDays, keyToLocalDate } from '../constants/dateUtils';
 import { SYMPTOMS, normalizeSymptomIds } from './symptoms';
+import { MUCUS_OBSERVATIONS, normalizeMucusNote } from './cervicalMucus';
+import type { MucusValue } from './cervicalMucus';
 
 // ---------- Values ----------
 
 export type PeriodStatus = 'yes' | 'no';
 export type FlowValue = 'none' | 'spotting' | 'light' | 'medium' | 'heavy';
 export type MoodValue = 'very_low' | 'low' | 'okay' | 'good' | 'great';
-export type MucusValue = 'dry' | 'sticky' | 'creamy' | 'watery' | 'eggWhite';
+export type { MucusValue }; // defined with the central list in lib/cervicalMucus.ts
 export type SexualActivityValue = 'none' | 'protected' | 'unprotected';
 
 export type DailyTrackingRecord = {
@@ -26,12 +28,13 @@ export type DailyTrackingRecord = {
   mood: MoodValue | null;
   energy: number | null;                     // 0-100
   cervicalMucus: MucusValue | null;
+  cervicalMucusNote: string | null;          // optional note, only with "Unusual / Other"
   sexualActivity: SexualActivityValue | null;
   medications: string[] | null;              // [] = she chose "None taken"
   updatedAt: string | null;                  // ISO time of last save; null = never saved
 };
 
-export type TrackedField = Exclude<keyof DailyTrackingRecord, 'date' | 'updatedAt'>;
+export type TrackedField = Exclude<keyof DailyTrackingRecord, 'date' | 'updatedAt' | 'cervicalMucusNote'>;
 
 export const TRACKED_FIELDS: TrackedField[] = [
   'period', 'flow', 'symptoms', 'mood', 'energy', 'cervicalMucus', 'sexualActivity', 'medications',
@@ -62,13 +65,8 @@ export const MOOD_OPTIONS: Option<MoodValue>[] = [
   { value: 'great', label: 'Great' },
 ];
 
-export const MUCUS_OPTIONS: Option<MucusValue>[] = [
-  { value: 'dry', label: 'Dry' },
-  { value: 'sticky', label: 'Sticky' },
-  { value: 'creamy', label: 'Creamy' },
-  { value: 'watery', label: 'Watery' },
-  { value: 'eggWhite', label: 'Egg white' },
-];
+// Labels come from the central list (lib/cervicalMucus.ts)
+export const MUCUS_OPTIONS: Option<MucusValue>[] = MUCUS_OBSERVATIONS.map((m) => ({ value: m.id, label: m.cardLabel }));
 
 export const SEXUAL_ACTIVITY_OPTIONS: Option<SexualActivityValue>[] = [
   { value: 'none', label: 'No sex' },
@@ -129,6 +127,7 @@ export function emptyRecord(date: string): DailyTrackingRecord {
     mood: null,
     energy: null,
     cervicalMucus: null,
+    cervicalMucusNote: null,
     sexualActivity: null,
     medications: null,
     updatedAt: null,
@@ -158,6 +157,7 @@ export function normalizeRecord(date: string, raw: unknown): DailyTrackingRecord
     typeof r.energy === 'number' && Number.isFinite(r.energy)
       ? Math.round(Math.max(0, Math.min(100, r.energy)))
       : null;
+  const mucus = oneOf(MUCUS_OPTIONS, r.cervicalMucus === 'eggWhite' ? 'egg_white' : r.cervicalMucus); // 'eggWhite' = earlier ID
   return {
     date,
     period: oneOf(PERIOD_OPTIONS, r.period),
@@ -165,7 +165,8 @@ export function normalizeRecord(date: string, raw: unknown): DailyTrackingRecord
     symptoms: symptomList(r.symptoms),
     mood: oneOf(MOOD_OPTIONS, r.mood === 'veryLow' ? 'very_low' : r.mood), // 'veryLow' = earlier ID
     energy,
-    cervicalMucus: oneOf(MUCUS_OPTIONS, r.cervicalMucus),
+    cervicalMucus: mucus,
+    cervicalMucusNote: mucus === 'other' ? normalizeMucusNote(r.cervicalMucusNote) : null,
     sexualActivity: oneOf(SEXUAL_ACTIVITY_OPTIONS, r.sexualActivity),
     medications: stringList(r.medications),
     updatedAt: typeof r.updatedAt === 'string' ? r.updatedAt : null,

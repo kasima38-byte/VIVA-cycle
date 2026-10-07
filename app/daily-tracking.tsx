@@ -11,6 +11,7 @@ import DailyTrackingSheet, { SheetField } from '../components/DailyTrackingSheet
 import PeriodSheet, { recordedText } from '../components/PeriodSheet';
 import FlowSheet from '../components/FlowSheet';
 import SymptomsSheet from '../components/SymptomsSheet';
+import MucusSheet from '../components/MucusSheet';
 import DateSelector, { DateItem } from '../components/DateSelector';
 import EnergySlider from '../components/EnergySlider';
 import MoodSelector from '../components/MoodSelector';
@@ -111,6 +112,7 @@ export default function DailyTrackingScreen() {
   const [periodOpen, setPeriodOpen] = useState(false);
   const [flowOpen, setFlowOpen] = useState(false);
   const [symptomsOpen, setSymptomsOpen] = useState(false);
+  const [mucusOpen, setMucusOpen] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const stickyHeight = useRef(0);
   const sectionY = useRef({ mood: 0, energy: 0 });
@@ -179,6 +181,10 @@ export default function DailyTrackingScreen() {
     }
     if (field === 'symptoms') {
       setSymptomsOpen(true);
+      return;
+    }
+    if (field === 'cervicalMucus') {
+      setMucusOpen(true);
       return;
     }
     setSheet(field);
@@ -454,6 +460,14 @@ export default function DailyTrackingScreen() {
           </Text>
         </Pressable>
       </View>
+
+      <MucusSheet
+        visible={mucusOpen}
+        date={selectedDate}
+        today={today}
+        onClose={() => setMucusOpen(false)}
+        onFeedback={show}
+      />
 
       <SymptomsSheet
         visible={symptomsOpen}

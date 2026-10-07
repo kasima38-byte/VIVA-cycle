@@ -49,7 +49,14 @@ export function useDailyTracking() {
   // so their cards always show the saved values
   const base = draft.date === selectedDate ? draft : saved;
   const record = useMemo(
-    () => ({ ...base, period: saved.period, flow: saved.flow, symptoms: saved.symptoms }),
+    () => ({
+      ...base,
+      period: saved.period,
+      flow: saved.flow,
+      symptoms: saved.symptoms,
+      cervicalMucus: saved.cervicalMucus,
+      cervicalMucusNote: saved.cervicalMucusNote,
+    }),
     [base, saved]
   );
 

@@ -9,12 +9,13 @@
 
 import { DayInfo } from './cycleData';
 import { addDays, CycleEstimate, cycleDayOn, diffDays, PeriodLog, predictCycles } from '../lib/cycleEngine';
-import type { FlowValue } from '../lib/dailyTracking';
+import type { FlowValue, MucusValue } from '../lib/dailyTracking';
 
 export type DayModel = DayInfo & {
   isPredictedPeriod: boolean;
   cycleDay: number | null; // from the engine; null before the first logged period
   flow?: FlowValue | null; // recorded flow / spotting - never makes a day a period day
+  cervicalMucus?: MucusValue | null; // recorded observation only - never changes fertile/ovulation days
 };
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -31,7 +32,8 @@ export function buildCalendarMonth(
   est: CycleEstimate | null,
   sexDates: string[],
   todayKey: string,
-  bleeding?: { period: Set<string>; notPeriod: Set<string>; flow?: Record<string, FlowValue> } // recorded facts
+  bleeding?: { period: Set<string>; notPeriod: Set<string>; flow?: Record<string, FlowValue> }, // recorded facts
+  observations?: { mucus?: Record<string, MucusValue> } // other recorded observations (not drawn yet)
 ): DayModel[] {
   const confirmedDays = new Set<string>();
   const predictedDays = new Set<string>();
@@ -87,6 +89,7 @@ export function buildCalendarMonth(
     isOvulation: ovulationDays.has(dateKey),
     isSexLogged: sex.has(dateKey),
     flow: bleeding?.flow?.[dateKey] ?? null,
+    cervicalMucus: observations?.mucus?.[dateKey] ?? null,
     cycleDay: cycleDayOn(periods, dateKey, todayKey),
   });
 

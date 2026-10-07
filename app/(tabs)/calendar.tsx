@@ -1,3 +1,4 @@
+import { mucusByDate } from '../../lib/mucusTracking';
 import { bleedingMarks } from '../../lib/periodTracking';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -37,7 +38,7 @@ export default function CalendarScreen() {
   const [monthIndex, setMonthIndex] = useState(todayDate.getMonth());
 
   const days = useMemo(
-    () => buildCalendarMonth(year, monthIndex, viva.periods, est, sexDates, today, bleedingMarks(viva.dailyLogs)),
+    () => buildCalendarMonth(year, monthIndex, viva.periods, est, sexDates, today, bleedingMarks(viva.dailyLogs), { mucus: mucusByDate(viva.dailyLogs) }),
     [year, monthIndex, viva.periods, viva.dailyLogs, est, today]
   );
 
