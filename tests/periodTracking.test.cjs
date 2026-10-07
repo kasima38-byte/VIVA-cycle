@@ -64,7 +64,8 @@ async function main() {
   check('today = Period Day 1', info(today).status === 'period' && info(today).dayNumber === 1, info(today));
 
   console.log('CASE 2 - three consecutive days (other tracking already on the middle day)');
-  await svc.updateDailyRecord(A1, { mood: 'good', energy: 50, symptoms: ['headache'] });
+  await svc.updateDailyRecord(A1, { mood: 'good', energy: 50 });
+  await require('../lib/symptomService').saveSymptoms(A1, ['headache']);
   for (const d of [A0, A1, A2]) check('mark ' + d, (await period.markPeriodDay(d)) === 'saved');
   check('Day 1, 2, 3', eq([A0, A1, A2].map((d) => info(d).dayNumber), [1, 2, 3]), [A0, A1, A2].map(info));
   check('"3 days recorded"', info(A1).episode.recordedDays === 3, info(A1).episode);

@@ -82,8 +82,9 @@ async function main() {
 
   console.log('TEST 10 - adding flow keeps everything else');
   await svc.updateDailyRecord(P1, {
-    mood: 'good', energy: 50, symptoms: ['headache'], sexualActivity: 'none', medications: ['iron'],
+    mood: 'good', energy: 50, sexualActivity: 'none', medications: ['iron'],
   });
+  await require('../lib/symptomService').saveSymptoms(P1, ['headache']);
   await period.markPeriodDay(P1);
   await flow.saveFlow(P1, 'medium');
   const r1 = rec(P1);
