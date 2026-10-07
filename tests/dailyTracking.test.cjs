@@ -35,7 +35,11 @@ function check(name, ok, detail) {
   else { failed++; console.log('  FAIL  ' + name + '\n        got: ' + JSON.stringify(detail)); }
 }
 const same = (a, b) => JSON.stringify([...(a || [])].sort()) === JSON.stringify([...(b || [])].sort());
-const savedLogs = () => JSON.parse(memory.get('viva-cycle:data') || '{}').dailyLogs || {};
+const savedLogs = () => {
+  const out = {};
+  for (const [k, v] of memory) if (k.startsWith('viva-cycle:daily:')) Object.assign(out, JSON.parse(v));
+  return out;
+};
 
 async function main() {
   let app = freshApp();

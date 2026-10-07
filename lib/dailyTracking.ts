@@ -38,10 +38,11 @@ export type DailyTrackingRecord = {
   cervicalMucusNote: string | null;          // optional note, only with "Unusual / Other"
   sexualActivity: SexualActivity | null;      // private: the card only ever says "Tracked"
   medications: MedicationEntry[] | null;     // private: the card only shows a count
+  createdAt: string | null;                  // ISO time the day was first recorded
   updatedAt: string | null;                  // ISO time of last save; null = never saved
 };
 
-export type TrackedField = Exclude<keyof DailyTrackingRecord, 'date' | 'updatedAt' | 'cervicalMucusNote'>;
+export type TrackedField = Exclude<keyof DailyTrackingRecord, 'date' | 'createdAt' | 'updatedAt' | 'cervicalMucusNote'>;
 
 export const TRACKED_FIELDS: TrackedField[] = [
   'period', 'flow', 'symptoms', 'mood', 'energy', 'cervicalMucus', 'sexualActivity', 'medications',
@@ -137,6 +138,7 @@ export function emptyRecord(date: string): DailyTrackingRecord {
     cervicalMucusNote: null,
     sexualActivity: null,
     medications: null,
+    createdAt: null,
     updatedAt: null,
   };
 }
@@ -176,6 +178,7 @@ export function normalizeRecord(date: string, raw: unknown): DailyTrackingRecord
     cervicalMucusNote: mucus === 'other' ? normalizeMucusNote(r.cervicalMucusNote) : null,
     sexualActivity: normalizeSexualActivity(r.sexualActivity),
     medications: normalizeMedications(r.medications, date),
+    createdAt: typeof r.createdAt === 'string' ? r.createdAt : null,
     updatedAt: typeof r.updatedAt === 'string' ? r.updatedAt : null,
   };
 }

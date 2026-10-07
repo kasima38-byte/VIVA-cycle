@@ -38,7 +38,14 @@ function check(name, ok, detail) {
   else { failed++; console.log('  FAIL  ' + name + '\n        got: ' + JSON.stringify(detail)); }
 }
 const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-const stored = () => JSON.parse(memory.get('viva-cycle:data') || '{}').dailyLogs || {};
+const stored = () => {
+  // Daily records live in one key per month ("viva-cycle:daily:YYYY-MM")
+  const out = {};
+  for (const [k, v] of memory) if (k.startsWith('viva-cycle:daily:')) Object.assign(out, JSON.parse(v));
+  for (const d of Object.keys(out)) { const { schemaVersion: _v, ...r } = out[d]; out[d] = r; }
+  return out;
+};
+const canon = (logs) => JSON.stringify(Object.keys(logs).sort().map((d) => [d, logs[d]]));
 const strip = (r, ...fields) => { const c = { ...r }; delete c.updatedAt; fields.forEach((f) => delete c[f]); return c; };
 
 async function main() {
@@ -118,21 +125,21 @@ async function main() {
   check('only records inside the range, oldest first', eq(range.map((r) => r.date), [A[0], A[1], A[2], A[3]]), range.map((r) => r.date));
 
   console.log('TEST 9 - storage failure');
-  const phoneBefore = memory.get('viva-cycle:data');
+  const phoneBefore = JSON.stringify([...memory.entries()].sort());
   failing = true;
   check('a failed save reports "failed"', (await svc.updateDailyTrackingField(today, 'mood', 'great')) === 'failed');
   check('nothing unsaved is shown as saved (screen rolled back)', rec(today).mood === 'good', rec(today));
-  check('the phone still has the previous data', memory.get('viva-cycle:data') === phoneBefore);
+  check('the phone still has the previous data', JSON.stringify([...memory.entries()].sort()) === phoneBefore);
   check('a failed multi-day period change leaves every day as it was', (await period.savePeriodRange(D(-15), D(-13))) === 'failed' && period.getPeriodInfo(D(-14)).status === 'untracked');
   check('a failed sheet save is also rolled back', (await flow.saveFlow(today, 'light')) === 'failed' && rec(today).flow === null);
   failing = false;
   check('Try Again works once storage recovers', (await svc.updateDailyTrackingField(today, 'mood', 'great')) === 'saved' && rec(today).mood === 'great' && stored()[today].mood === 'great');
 
   console.log('TEST 8 - restart: every record stays with its date');
-  const snapshot = JSON.stringify(stored());
+  const snapshot = canon(stored());
   app = freshApp();
   await app.store.loadVivaStore();
-  check('all records identical after restart', JSON.stringify(app.store.getVivaState().dailyLogs) === snapshot);
+  check('all records identical after restart', canon(app.store.getVivaState().dailyLogs) === snapshot);
   check('TEST 1 again: today = Great after restart', app.svc.readDailyRecord(today).mood === 'great');
   check('the period day kept its other answers', app.svc.readDailyRecord(P).flow === 'heavy' && app.svc.readDailyRecord(P).medications[0].name === 'Ibuprofen');
 

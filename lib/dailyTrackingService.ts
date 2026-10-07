@@ -12,6 +12,7 @@ import {
 } from './dailyTracking';
 import { getVivaState, putDailyLog, removeDailyLog } from './vivaStore';
 import { PeriodResult, removePeriodDay } from './periodService';
+import { monthsBetween } from './dailyStorage';
 
 export type SaveResult =
   | 'saved'      // written to the phone
@@ -109,12 +110,59 @@ export async function clearDailyRecordField(date: string, field: TrackedField): 
   return updateDailyTrackingField(date, field, null);
 }
 
-/** Saved records between two dates (inclusive), oldest first. */
+// Month index: date keys grouped by month. Rebuilt only when saved data changes.
+const monthIndexCache = new WeakMap<object, Map<string, string[]>>();
+
+function monthIndex(): { logs: Record<string, DailyTrackingRecord>; index: Map<string, string[]> } {
+  const logs = getVivaState().dailyLogs;
+  let index = monthIndexCache.get(logs);
+  if (!index) {
+    index = new Map();
+    for (const d of Object.keys(logs)) {
+      const m = d.slice(0, 7);
+      const list = index.get(m) ?? [];
+      list.push(d);
+      index.set(m, list);
+    }
+    index.forEach((list) => list.sort());
+    monthIndexCache.set(logs, index);
+  }
+  return { logs, index };
+}
+
+/** Saved records between two dates (inclusive), oldest first. Only months in range are visited. */
 export function getRecordsForDateRange(start: string, end: string): DailyTrackingRecord[] {
   if (!isValidDateKey(start) || !isValidDateKey(end) || end < start) return [];
-  const logs = getVivaState().dailyLogs;
-  return Object.keys(logs)
-    .filter((d) => d >= start && d <= end)
-    .sort()
-    .map((d) => normalizeRecord(d, logs[d]));
+  const { logs, index } = monthIndex();
+  const out: DailyTrackingRecord[] = [];
+  for (const m of monthsBetween(start, end)) {
+    for (const d of index.get(m) ?? []) {
+      if (d >= start && d <= end) out.push(normalizeRecord(d, logs[d]));
+    }
+  }
+  return out;
+}
+
+/** One calendar month of saved records (month 1-12), oldest first. */
+export function getRecordsForMonth(year: number, month: number): DailyTrackingRecord[] {
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) return [];
+  const { logs, index } = monthIndex();
+  const m = year + '-' + String(month).padStart(2, '0');
+  return (index.get(m) ?? []).map((d) => normalizeRecord(d, logs[d]));
+}
+
+/** The most recent date with saved tracking, or null. */
+export function getLatestTrackedDate(): string | null {
+  const { index } = monthIndex();
+  const months = Array.from(index.keys()).sort();
+  const last = months[months.length - 1];
+  if (!last) return null;
+  const days = index.get(last) ?? [];
+  return days[days.length - 1] ?? null;
+}
+
+/** A fresh, untracked record for a date. Kept in memory only - nothing is stored
+ *  until she actually records something. */
+export function createDailyRecord(date: string): DailyTrackingRecord | null {
+  return isValidDateKey(date) ? emptyRecord(date) : null;
 }

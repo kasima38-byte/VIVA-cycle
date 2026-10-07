@@ -13,6 +13,7 @@ import {
 } from './cycleEngine';
 import { DailyTrackingRecord, hasAnyData, normalizeRecord } from './dailyTracking';
 import { PeriodChanges, derivePeriodLogs, episodesFromLogs } from './periodTracking';
+import { DAMAGED_PREFIX, DAY_PREFIX, JOURNAL_KEY, isMonthKey, migrateRecord, serializeMonths } from './dailyStorage';
 import { isValidDateKey } from '../constants/dateUtils';
 
 /** One day of Daily Tracking (her own entries). Full model: lib/dailyTracking.ts */
@@ -20,7 +21,7 @@ export type DailyLog = DailyTrackingRecord;
 
 const STORAGE_KEY = 'viva-cycle:data';
 const BACKUP_KEY = 'viva-cycle:data-backup'; // last copy that was read successfully
-const SCHEMA_VERSION = 2; // 2: bleeding days are the stored period data
+const SCHEMA_VERSION = 3; // 2: bleeding days are the period data; 3: daily records stored one key per month
 
 export interface VivaData {
   version: number;
@@ -60,6 +61,8 @@ let canSave = false;
 // What is really on the phone (updated only after a successful write).
 // If a write fails, the screen goes back to this - nothing unsaved ever looks saved.
 let savedData: VivaData | null = null;
+let savedCore: string | null = null;           // profile text on the phone
+let savedMonths = new Map<string, string>();   // month -> records text on the phone
 
 // ---------- Subscriptions ----------
 
@@ -89,18 +92,42 @@ export function useVivaStore(): VivaState {
 // Writes run one after another, so an older save can never land after a newer one.
 let writeChain: Promise<unknown> = Promise.resolve();
 
-/** Resolves true only once the data is really on the phone. */
+/** Writes only what changed: the month(s) of the changed day(s), and the profile if it changed.
+ *  Several keys go through a journal, so an interrupted write is finished on the next launch
+ *  (all of the change, never half). Resolves true only once it is really on the phone. */
 function persist(): Promise<boolean> {
   if (!canSave) return Promise.resolve(false);
   const { loaded: _loaded, loadError: _loadError, ...data } = state;
-  const json = JSON.stringify(data);
+  const { dailyLogs, ...core } = data;
+  const months = serializeMonths(dailyLogs);
+  const coreJson = JSON.stringify({
+    ...core,
+    version: SCHEMA_VERSION,
+    layout: 'monthly',
+    dailyMonths: Array.from(months.keys()),
+  });
   const write = writeChain.then(async () => {
+    const sets: [string, string][] = [];
+    const removes: string[] = [];
+    months.forEach((json, m) => {
+      if (savedMonths.get(m) !== json) sets.push([DAY_PREFIX + m, json]);
+    });
+    savedMonths.forEach((_json, m) => {
+      if (!months.has(m)) removes.push(DAY_PREFIX + m);
+    });
+    if (coreJson !== savedCore) sets.push([STORAGE_KEY, coreJson]); // index last
     try {
-      await AsyncStorage.setItem(STORAGE_KEY, json);
+      const several = sets.length + removes.length > 1;
+      if (several) await AsyncStorage.setItem(JOURNAL_KEY, JSON.stringify({ sets, removes }));
+      for (const [k, v] of sets) await AsyncStorage.setItem(k, v);
+      for (const k of removes) await AsyncStorage.removeItem(k);
+      if (several) await AsyncStorage.removeItem(JOURNAL_KEY);
+      savedCore = coreJson;
+      savedMonths = months;
       savedData = data;
       return true;
-    } catch (e) {
-      console.warn('VIVA: could not save data', e);
+    } catch {
+      console.warn('VIVA: could not save data'); // never log the data itself
       return false;
     }
   });
@@ -136,7 +163,7 @@ function withPeriodChanges(
   for (const [date, value] of Object.entries(changes)) {
     if (!isValidDateKey(date)) continue;
     const rec = normalizeRecord(date, next[date] ?? {});
-    const updated: DailyLog = { ...rec, period: value, updatedAt: stamp ?? rec.updatedAt };
+    const updated: DailyLog = { ...rec, period: value, createdAt: rec.createdAt ?? stamp, updatedAt: stamp ?? rec.updatedAt };
     if (hasAnyData(updated)) next[date] = updated;
     else delete next[date];
   }
@@ -175,7 +202,7 @@ function parseDailyLogs(raw: unknown): Record<string, DailyLog> {
 }
 
 /** Parse saved JSON and keep only well-formed values. Throws if it is not a saved profile. */
-function parseSaved(raw: string): VivaData {
+function parseSaved(raw: string, extraLogs: Record<string, unknown> = {}): VivaData {
   const saved = JSON.parse(raw);
   if (!saved || typeof saved !== 'object' || !Array.isArray(saved.periods)) throw new Error('not a VIVA profile');
   const isDate = (d: unknown) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d);
@@ -186,10 +213,58 @@ function parseSaved(raw: string): VivaData {
     ...EMPTY,
     ...saved,
     baseline: { ...EMPTY.baseline, ...(saved.baseline ?? {}) },
-    ...periodData(saved.version, sortPeriods(periods), parseDailyLogs(saved.dailyLogs)),
+    ...periodData(saved.version, sortPeriods(periods), parseDailyLogs({
+      ...(saved.dailyLogs && typeof saved.dailyLogs === 'object' && !Array.isArray(saved.dailyLogs) ? saved.dailyLogs : {}),
+      ...extraLogs,
+    })),
     reminders: saved.reminders && typeof saved.reminders === 'object' && !Array.isArray(saved.reminders) ? saved.reminders : {},
     version: SCHEMA_VERSION,
   };
+}
+
+/** A write interrupted last time (app closed or phone died) is finished now: all of it. */
+async function finishInterruptedWrite(): Promise<void> {
+  const journal = await AsyncStorage.getItem(JOURNAL_KEY);
+  if (journal === null) return;
+  try {
+    const { sets, removes } = JSON.parse(journal) as { sets: [string, string][]; removes: string[] };
+    for (const [k, v] of sets) await AsyncStorage.setItem(k, v);
+    for (const k of removes) await AsyncStorage.removeItem(k);
+  } catch {
+    // An unreadable journal means the write never started: the previous data is intact
+  }
+  await AsyncStorage.removeItem(JOURNAL_KEY);
+}
+
+/** Read every month listed in the profile. A month that can't be read is set aside untouched
+ *  (never deleted) and everything else still loads. */
+async function readMonths(coreRaw: string | null): Promise<{ logs: Record<string, unknown>; raw: Map<string, string>; monthly: boolean }> {
+  const logs: Record<string, unknown> = {};
+  const raw = new Map<string, string>();
+  let months: string[] = [];
+  let monthly = false;
+  try {
+    const core = coreRaw ? JSON.parse(coreRaw) : null;
+    monthly = !!core && core.layout === 'monthly';
+    if (core && Array.isArray(core.dailyMonths)) months = core.dailyMonths.filter(isMonthKey);
+  } catch {
+    return { logs, raw, monthly }; // an unreadable profile is handled by the caller
+  }
+  for (const m of months) {
+    const text = await AsyncStorage.getItem(DAY_PREFIX + m);
+    if (text === null) continue;
+    try {
+      const bucket = JSON.parse(text);
+      if (!bucket || typeof bucket !== 'object' || Array.isArray(bucket)) throw new Error('unreadable month');
+      for (const [d, r] of Object.entries(bucket)) {
+        if (d.slice(0, 7) === m) logs[d] = migrateRecord(r);
+      }
+      raw.set(m, text);
+    } catch {
+      await AsyncStorage.setItem(DAMAGED_PREFIX + m, text).catch(() => {});
+    }
+  }
+  return { logs, raw, monthly };
 }
 
 /** Read saved data from the phone. Safe to call more than once. */
@@ -197,23 +272,33 @@ export function loadVivaStore(): Promise<void> {
   if (!loading) {
     loading = (async () => {
       let raw: string | null = null;
+      let monthLogs: Record<string, unknown> = {};
+      let layoutMonthly = false;
       try {
+        await finishInterruptedWrite();
         raw = await AsyncStorage.getItem(STORAGE_KEY);
+        const months = await readMonths(raw);
+        monthLogs = months.logs;
+        savedMonths = months.raw;
+        layoutMonthly = months.monthly;
         if (raw === null) {
           // Nothing saved yet: a genuinely new user
           state = { ...EMPTY, loaded: true, loadError: false };
         } else {
-          state = { ...parseSaved(raw), loaded: true, loadError: false };
+          state = { ...parseSaved(raw, monthLogs), loaded: true, loadError: false };
+          savedCore = layoutMonthly ? raw : null;
           AsyncStorage.setItem(BACKUP_KEY, raw).catch(() => {});
         }
         canSave = true;
       } catch (e) {
-        console.warn('VIVA: could not load data', e);
+        console.warn('VIVA: could not load saved data'); // never log the data itself
         // Try the last good copy before giving up
         try {
           const backup = await AsyncStorage.getItem(BACKUP_KEY);
           if (backup === null) throw new Error('no backup');
-          state = { ...parseSaved(backup), loaded: true, loadError: false };
+          const backupMonths = await readMonths(backup);
+          savedMonths = backupMonths.raw;
+          state = { ...parseSaved(backup, backupMonths.logs), loaded: true, loadError: false };
           canSave = true;
         } catch {
           // Do NOT continue as a new user: block saving and let her retry
@@ -224,6 +309,8 @@ export function loadVivaStore(): Promise<void> {
       if (canSave) {
         const { loaded: _l, loadError: _e, ...data } = state;
         savedData = data;
+        // Finish any migration or repair: writes only the months that differ
+        if (raw !== null) void persist();
       }
       emit();
     })();
@@ -328,7 +415,10 @@ export function putDailyLog(record: DailyLog): Promise<boolean> {
   if (!canSave || !isValidDateKey(record.date)) return Promise.resolve(false);
   const clean = normalizeRecord(record.date, record);
   const dailyLogs = { ...state.dailyLogs };
-  if (hasAnyData(clean)) dailyLogs[clean.date] = { ...clean, updatedAt: new Date().toISOString() };
+  const now = new Date().toISOString();
+  if (hasAnyData(clean)) {
+    dailyLogs[clean.date] = { ...clean, createdAt: state.dailyLogs[clean.date]?.createdAt ?? now, updatedAt: now };
+  }
   else delete dailyLogs[clean.date];
   return updateDailyLogs(dailyLogs);
 }
@@ -373,7 +463,11 @@ export async function resetVivaStore() {
   emit();
   try {
     await AsyncStorage.removeItem(STORAGE_KEY);
+    for (const m of savedMonths.keys()) await AsyncStorage.removeItem(DAY_PREFIX + m);
+    await AsyncStorage.removeItem(JOURNAL_KEY);
+    savedMonths = new Map();
+    savedCore = null;
   } catch (e) {
-    console.warn('VIVA: could not clear data', e);
+    console.warn('VIVA: could not clear saved data'); // never log the data itself
   }
 }

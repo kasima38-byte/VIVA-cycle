@@ -40,7 +40,14 @@ function check(name, ok, detail) {
   else { failed++; console.log('  FAIL  ' + name + '\n        got: ' + JSON.stringify(detail)); }
 }
 const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-const stored = () => JSON.parse(memory.get('viva-cycle:data') || '{}').dailyLogs || {};
+const stored = () => {
+  // Daily records live in one key per month ("viva-cycle:daily:YYYY-MM")
+  const out = {};
+  for (const [k, v] of memory) if (k.startsWith('viva-cycle:daily:')) Object.assign(out, JSON.parse(v));
+  for (const d of Object.keys(out)) { const { schemaVersion: _v, ...r } = out[d]; out[d] = r; }
+  return out;
+};
+const canon = (logs) => JSON.stringify(Object.keys(logs).sort().map((d) => [d, logs[d]]));
 
 async function main() {
   let app = freshApp();
@@ -128,10 +135,10 @@ async function main() {
   check('neutral progress wording is used', /categories tracked/.test(fs.readFileSync(path.join(ROOT, 'app/daily-tracking.tsx'), 'utf8')));
 
   console.log('TEST 8 - restart');
-  const snapshot = JSON.stringify(stored());
+  const snapshot = canon(stored());
   app = freshApp();
   await app.store.loadVivaStore();
-  check('every partial record survives exactly', JSON.stringify(app.store.getVivaState().dailyLogs) === snapshot);
+  check('every partial record survives exactly', canon(app.store.getVivaState().dailyLogs) === snapshot);
   check('today: Great + Energy 70, nothing else', app.svc.readDailyRecord(today).mood === 'great' && app.svc.readDailyRecord(today).energy === 70 && app.model.trackedCount(app.svc.readDailyRecord(today)) === 2);
 
   console.warn = realWarn;
