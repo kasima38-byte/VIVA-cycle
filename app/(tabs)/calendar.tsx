@@ -3,7 +3,7 @@ import { bleedingMarks } from '../../lib/periodTracking';
 import { buildPeriodRecords, calendarTrackingCard } from '../../lib/periodLength';
 import { Ionicons } from '@expo/vector-icons';
 import { Href, router, useFocusEffect } from 'expo-router';
-import { takePendingMonth } from '../../lib/calendarNavigation';
+import { subscribePendingMonth, takePendingMonth } from '../../lib/calendarNavigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -70,16 +70,18 @@ export default function CalendarScreen() {
     [viva.dailyLogs, today]
   );
 
-  // Back from the Year Overview after picking a month: show that month
-  useFocusEffect(
-    useCallback(() => {
-      const picked = takePendingMonth();
-      if (picked) {
-        setYear(picked.year);
-        setMonthIndex(picked.monthIndex);
-      }
-    }, [])
-  );
+  // Month tapped on the Year Overview: show exactly that year + month.
+  // Applied the moment it is tapped (subscription) and checked again on focus as a backup;
+  // whichever comes first takes it once. Never resets to today unless today's month was tapped.
+  const applyPickedMonth = useCallback(() => {
+    const picked = takePendingMonth();
+    if (picked) {
+      setYear(picked.year);
+      setMonthIndex(picked.monthIndex);
+    }
+  }, []);
+  useEffect(() => subscribePendingMonth(applyPickedMonth), [applyPickedMonth]);
+  useFocusEffect(applyPickedMonth);
 
   const goToday = () => {
     setYear(todayDate.getFullYear());
