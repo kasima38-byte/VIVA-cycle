@@ -1,0 +1,8 @@
+{
+  "name": "VIVA Cycle",
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "forwardPorts": [8081],
+  "portsAttributes": {
+    "8081": { "label": "Expo Metro (phone)", "onAutoForward": "silent" }
+  }
+}
