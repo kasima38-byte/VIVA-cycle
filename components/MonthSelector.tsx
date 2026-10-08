@@ -7,19 +7,26 @@ type Props = {
   onPrevMonth: () => void;
   onNextMonth: () => void;
   onToday: () => void;
+  onLabelPress?: () => void; // e.g. open the Year Overview
 };
 
-export default function MonthSelector({ label, onPrevMonth, onNextMonth, onToday }: Props) {
+export default function MonthSelector({ label, onPrevMonth, onNextMonth, onToday, onLabelPress }: Props) {
   return (
     <View style={styles.row}>
       <Pressable onPress={onPrevMonth} hitSlop={10} accessibilityRole="button" accessibilityLabel="Previous month">
         <Ionicons name="chevron-back" size={22} color={colors.navy} />
       </Pressable>
 
-      <View style={styles.pill}>
+      <Pressable
+        onPress={onLabelPress}
+        disabled={!onLabelPress}
+        style={styles.pill}
+        accessibilityRole={onLabelPress ? 'button' : 'text'}
+        accessibilityLabel={onLabelPress ? label + ', open year overview' : label}
+      >
         <Text style={styles.pillText}>{label}</Text>
         <Ionicons name="chevron-down" size={16} color={colors.magenta} style={{ marginLeft: 6 }} />
-      </View>
+      </Pressable>
 
       <Pressable onPress={onNextMonth} hitSlop={10} accessibilityRole="button" accessibilityLabel="Next month">
         <Ionicons name="chevron-forward" size={22} color={colors.navy} />

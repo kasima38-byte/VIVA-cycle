@@ -2,8 +2,9 @@ import { mucusByDate } from '../../lib/mucusTracking';
 import { bleedingMarks } from '../../lib/periodTracking';
 import { buildPeriodRecords, calendarTrackingCard } from '../../lib/periodLength';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Href, router, useFocusEffect } from 'expo-router';
+import { takePendingMonth } from '../../lib/calendarNavigation';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CalendarLegend from '../../components/CalendarLegend';
@@ -67,6 +68,17 @@ export default function CalendarScreen() {
   const card = useMemo(
     () => calendarTrackingCard(buildPeriodRecords(viva.dailyLogs, today), viva.dailyLogs, today),
     [viva.dailyLogs, today]
+  );
+
+  // Back from the Year Overview after picking a month: show that month
+  useFocusEffect(
+    useCallback(() => {
+      const picked = takePendingMonth();
+      if (picked) {
+        setYear(picked.year);
+        setMonthIndex(picked.monthIndex);
+      }
+    }, [])
   );
 
   const goToday = () => {
@@ -142,6 +154,7 @@ export default function CalendarScreen() {
             onPrevMonth={goPrevMonth}
             onNextMonth={goNextMonth}
             onToday={goToday}
+            onLabelPress={() => router.push(('/year-overview?year=' + year) as Href)}
           />
 
           {(card || tapMessage) && (
