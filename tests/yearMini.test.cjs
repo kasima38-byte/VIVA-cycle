@@ -55,7 +55,7 @@ const comp = read('components/MiniMonthCalendar.tsx');
 check('one reusable component receives year + monthIndex and generates its month', comp.includes('buildMiniMonth(year, monthIndex)') && /year: number;\s*\n\s*monthIndex: number;/.test(comp));
 check('the screen uses that same component for all 12 months (no per-month code)', (screen.match(/<MiniMonthCalendar/g) || []).length === 1 && screen.includes('MONTH_NAMES.map((_, monthIndex) =>') && screen.includes('monthIndex={monthIndex}'));
 check('weekday header M T W T F S S', JSON.stringify(yo.WEEKDAY_INITIALS) === JSON.stringify(['M', 'T', 'W', 'T', 'F', 'S', 'S']) && comp.includes('WEEKDAY_INITIALS.map'));
-check('no cycle markers yet', !/isPeriod|isFertile|isOvulation|predicted|calculateCycle|bleeding/i.test(comp + screen));
+check('no predicted / fertile / ovulation markers yet', !/isPredictedPeriod|isFertile|isOvulation|calculateCycle/i.test(comp + screen));
 const changed = execSync('git diff HEAD --name-only', { cwd: ROOT }).toString();
 check('buildCalendarMonth / detailed calendar untouched', !changed.includes('constants/calendarModel.ts') && !changed.includes('components/CycleCalendar.tsx') && !changed.includes('components/CalendarDay.tsx'), changed);
 

@@ -1,19 +1,31 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Href, router, useLocalSearchParams } from 'expo-router';
+import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MiniMonthCalendar from '../components/MiniMonthCalendar';
-import { getToday } from '../constants/dateUtils';
 import { colors, spacing } from '../constants/theme';
 import { setPendingMonth } from '../lib/calendarNavigation';
+import { bleedingMarks } from '../lib/periodTracking';
+import { useToday } from '../lib/useToday';
+import { useVivaStore } from '../lib/vivaStore';
 import { MONTH_NAMES, parseYearParam } from '../lib/yearOverview';
+import { actualPeriodDaysByMonth } from '../lib/yearPeriods';
 
 export default function YearOverviewScreen() {
   const params = useLocalSearchParams<{ year?: string }>();
-  const today = getToday();
+  const today = useToday();
   const thisYear = Number(today.slice(0, 4));
   const year = parseYearParam(params.year, thisYear);
   const currentMonth = year === thisYear ? Number(today.slice(5, 7)) - 1 : -1;
+
+  // Same source of truth as the detailed Calendar; redraws whenever period data changes
+  const viva = useVivaStore();
+  const marks = useMemo(() => bleedingMarks(viva.dailyLogs), [viva.dailyLogs]);
+  const periodDays = useMemo(
+    () => actualPeriodDaysByMonth(year, viva.periods, marks, today),
+    [year, viva.periods, marks, today]
+  );
 
   const close = () => {
     if (router.canGoBack()) router.back();
@@ -50,6 +62,7 @@ export default function YearOverviewScreen() {
                 key={monthIndex}
                 year={year}
                 monthIndex={monthIndex}
+                periodDays={periodDays[monthIndex]}
                 isCurrentMonth={monthIndex === currentMonth}
                 onPress={openMonth}
                 style={styles.cell}

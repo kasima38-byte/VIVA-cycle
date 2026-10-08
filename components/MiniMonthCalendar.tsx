@@ -6,14 +6,20 @@ import { WEEKDAY_INITIALS, buildMiniMonth } from '../lib/yearOverview';
 type Props = {
   year: number;
   monthIndex: number; // 0-11
+  periodDays?: ReadonlySet<number>; // actual logged period days in this month
   isCurrentMonth?: boolean;
   onPress?: (monthIndex: number) => void;
   style?: StyleProp<ViewStyle>;
 };
 
+const NONE: ReadonlySet<number> = new Set<number>();
+
 /** One compact month: name, M T W T F S S, and its real dates. Used for all 12 months. */
-export default function MiniMonthCalendar({ year, monthIndex, isCurrentMonth, onPress, style }: Props) {
+export default function MiniMonthCalendar({ year, monthIndex, periodDays = NONE, isCurrentMonth, onPress, style }: Props) {
   const month = useMemo(() => buildMiniMonth(year, monthIndex), [year, monthIndex]);
+  const count = periodDays.size;
+  const label =
+    month.name + ' ' + year + (count > 0 ? ', ' + count + (count === 1 ? ' logged period day' : ' logged period days') : '');
 
   return (
     <Pressable
@@ -21,7 +27,7 @@ export default function MiniMonthCalendar({ year, monthIndex, isCurrentMonth, on
       disabled={!onPress}
       style={({ pressed }) => [styles.card, isCurrentMonth && styles.cardCurrent, pressed && styles.cardPressed, style]}
       accessibilityRole={onPress ? 'button' : 'summary'}
-      accessibilityLabel={month.name + ' ' + year}
+      accessibilityLabel={label}
       accessibilityHint={onPress ? 'Opens this month in the calendar' : undefined}
     >
       <Text style={[styles.monthName, isCurrentMonth && styles.monthNameCurrent]} maxFontSizeMultiplier={1.4}>
@@ -36,11 +42,18 @@ export default function MiniMonthCalendar({ year, monthIndex, isCurrentMonth, on
       </View>
       {month.weeks.map((week, wi) => (
         <View key={'r' + wi} style={styles.row} importantForAccessibility="no-hide-descendants">
-          {week.map((d, di) => (
-            <Text key={wi + '-' + di} style={styles.day} maxFontSizeMultiplier={1.2}>
-              {d === null ? '' : d}
-            </Text>
-          ))}
+          {week.map((d, di) => {
+            const period = d !== null && periodDays.has(d);
+            return (
+              <View key={wi + '-' + di} style={styles.cell}>
+                <View style={period ? styles.periodMark : undefined}>
+                  <Text style={[styles.day, period && styles.periodText]} maxFontSizeMultiplier={1.2}>
+                    {d === null ? '' : d}
+                  </Text>
+                </View>
+              </View>
+            );
+          })}
         </View>
       ))}
     </Pressable>
@@ -62,5 +75,16 @@ const styles = StyleSheet.create({
   monthNameCurrent: { color: colors.magentaText },
   row: { flexDirection: 'row' },
   weekday: { width: '14.28%', textAlign: 'center', fontSize: 8, fontWeight: '700', color: colors.textSecondary },
-  day: { width: '14.28%', textAlign: 'center', fontSize: 9, lineHeight: 13, color: colors.navy },
+  cell: { width: '14.28%', height: 14, alignItems: 'center', justifyContent: 'center' },
+  // Same meaning as the detailed Calendar's actual period day: solid magenta, white number
+  periodMark: {
+    width: 13,
+    height: 13,
+    borderRadius: 6.5,
+    backgroundColor: colors.magenta,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  day: { textAlign: 'center', fontSize: 9, lineHeight: 12, color: colors.navy },
+  periodText: { color: colors.white, fontWeight: '800', fontSize: 8.5 },
 });
