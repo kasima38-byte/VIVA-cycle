@@ -99,8 +99,8 @@ async function main() {
   console.log('SCREEN');
   const screen = read('app/year-overview.tsx');
   const comp = read('components/MiniMonthCalendar.tsx');
-  check('screen reads the same store and recalculates on change', screen.includes('useVivaStore()') && screen.includes('[year, viva.periods, marks, today]'));
-  check('each month gets only its own days', screen.includes('periodDays={periodDays[monthIndex]}'));
+  check('screen reads the same store and recalculates on change', screen.includes('useVivaStore()') && screen.includes('[year, viva.periods, est, marks, today]'));
+  check('each month gets only its own days', screen.includes('periodDays={monthMarks[monthIndex].period}'));
   check('only the specific day numbers are styled (no whole-month dot)', comp.includes('periodDays.has(d)') && comp.includes('styles.periodMark'));
   check('same meaning as the detailed Calendar: solid magenta', /periodMark: \{[^}]*backgroundColor: colors\.magenta/.test(comp));
   check('screen readers hear the count, not just colour', comp.includes("' logged period days'"));

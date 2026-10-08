@@ -7,6 +7,7 @@ type Props = {
   year: number;
   monthIndex: number; // 0-11
   periodDays?: ReadonlySet<number>; // actual logged period days in this month
+  predictedDays?: ReadonlySet<number>; // predicted period days (actual always wins)
   isCurrentMonth?: boolean;
   onPress?: (monthIndex: number) => void;
   style?: StyleProp<ViewStyle>;
@@ -15,11 +16,14 @@ type Props = {
 const NONE: ReadonlySet<number> = new Set<number>();
 
 /** One compact month: name, M T W T F S S, and its real dates. Used for all 12 months. */
-export default function MiniMonthCalendar({ year, monthIndex, periodDays = NONE, isCurrentMonth, onPress, style }: Props) {
+export default function MiniMonthCalendar({ year, monthIndex, periodDays = NONE, predictedDays = NONE, isCurrentMonth, onPress, style }: Props) {
   const month = useMemo(() => buildMiniMonth(year, monthIndex), [year, monthIndex]);
   const count = periodDays.size;
+  const predictedCount = [...predictedDays].filter((d) => !periodDays.has(d)).length;
   const label =
-    month.name + ' ' + year + (count > 0 ? ', ' + count + (count === 1 ? ' logged period day' : ' logged period days') : '');
+    month.name + ' ' + year +
+    (count > 0 ? ', ' + count + (count === 1 ? ' logged period day' : ' logged period days') : '') +
+    (predictedCount > 0 ? ', ' + predictedCount + (predictedCount === 1 ? ' predicted period day' : ' predicted period days') : '');
 
   return (
     <Pressable
@@ -44,10 +48,11 @@ export default function MiniMonthCalendar({ year, monthIndex, periodDays = NONE,
         <View key={'r' + wi} style={styles.row} importantForAccessibility="no-hide-descendants">
           {week.map((d, di) => {
             const period = d !== null && periodDays.has(d);
+            const predicted = !period && d !== null && predictedDays.has(d); // actual always wins
             return (
               <View key={wi + '-' + di} style={styles.cell}>
-                <View style={period ? styles.periodMark : undefined}>
-                  <Text style={[styles.day, period && styles.periodText]} maxFontSizeMultiplier={1.2}>
+                <View style={period ? styles.periodMark : predicted ? styles.predictedMark : undefined}>
+                  <Text style={[styles.day, period && styles.periodText, predicted && styles.predictedText]} maxFontSizeMultiplier={1.2}>
                     {d === null ? '' : d}
                   </Text>
                 </View>
@@ -87,4 +92,16 @@ const styles = StyleSheet.create({
   },
   day: { textAlign: 'center', fontSize: 9, lineHeight: 12, color: colors.navy },
   periodText: { color: colors.white, fontWeight: '800', fontSize: 8.5 },
+  // Same meaning as the detailed Calendar's predicted period day: light pink, outlined
+  predictedMark: {
+    width: 13,
+    height: 13,
+    borderRadius: 6.5,
+    backgroundColor: colors.pinkSoft,
+    borderWidth: 1,
+    borderColor: colors.magenta,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  predictedText: { color: colors.magentaText, fontWeight: '700', fontSize: 8.5 },
 });

@@ -6,11 +6,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import MiniMonthCalendar from '../components/MiniMonthCalendar';
 import { colors, spacing } from '../constants/theme';
 import { setPendingMonth } from '../lib/calendarNavigation';
+import { calculateCycle } from '../lib/cycleEngine';
 import { bleedingMarks } from '../lib/periodTracking';
 import { useToday } from '../lib/useToday';
 import { useVivaStore } from '../lib/vivaStore';
 import { MONTH_NAMES, parseYearParam } from '../lib/yearOverview';
-import { actualPeriodDaysByMonth } from '../lib/yearPeriods';
+import { yearCalendarMarks } from '../lib/yearPeriods';
 
 export default function YearOverviewScreen() {
   const params = useLocalSearchParams<{ year?: string }>();
@@ -22,9 +23,11 @@ export default function YearOverviewScreen() {
   // Same source of truth as the detailed Calendar; redraws whenever period data changes
   const viva = useVivaStore();
   const marks = useMemo(() => bleedingMarks(viva.dailyLogs), [viva.dailyLogs]);
-  const periodDays = useMemo(
-    () => actualPeriodDaysByMonth(year, viva.periods, marks, today),
-    [year, viva.periods, marks, today]
+  // Same prediction the detailed Calendar uses
+  const est = useMemo(() => calculateCycle(viva.baseline, viva.periods, today), [viva.baseline, viva.periods, today]);
+  const monthMarks = useMemo(
+    () => yearCalendarMarks(year, viva.periods, est, marks, today),
+    [year, viva.periods, est, marks, today]
   );
 
   const close = () => {
@@ -62,7 +65,8 @@ export default function YearOverviewScreen() {
                 key={monthIndex}
                 year={year}
                 monthIndex={monthIndex}
-                periodDays={periodDays[monthIndex]}
+                periodDays={monthMarks[monthIndex].period}
+                predictedDays={monthMarks[monthIndex].predicted}
                 isCurrentMonth={monthIndex === currentMonth}
                 onPress={openMonth}
                 style={styles.cell}
