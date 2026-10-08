@@ -35,7 +35,7 @@ export default function CalendarScreen() {
   );
 
   // Sexual activity is not an approved VIVA feature: no markers are drawn
-  const sexDates: string[] = sexualActivityDates(viva.dailyLogs); // recorded activity only - one source
+  const sexDates: string[] = [];
 
   const [year, setYear] = useState(todayDate.getFullYear());
   const [monthIndex, setMonthIndex] = useState(todayDate.getMonth());
