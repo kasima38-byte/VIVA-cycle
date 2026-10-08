@@ -107,7 +107,8 @@ async function main() {
 
   console.log('SCREEN');
   const screen = fs.readFileSync(path.join(ROOT, 'app/(tabs)/calendar.tsx'), 'utf8');
-  check('instruction card text', /Track your period/.test(screen) && /Tap each day you have bleeding to record your period length\./.test(screen));
+  const cardSrc = screen + fs.readFileSync(path.join(ROOT, 'lib/periodLength.ts'), 'utf8');
+  check('instruction card text', /Track your period/.test(cardSrc) && /Tap each day you have bleeding to record your period length\./.test(cardSrc));
   check('taps are wired to the shared period service', /onDayPress=\{\(k\) => void onDayPress\(k\)\}/.test(screen) && /togglePeriodDay\(dateKey\)/.test(screen));
   check('one tap = one change; future dates explained', /if \(tapBusy\.current\) return;/.test(screen) && /today or earlier/.test(screen));
   check('no separate "End period" button', !/End period/i.test(screen));

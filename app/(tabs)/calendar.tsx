@@ -1,6 +1,7 @@
 import { sexualActivityDates } from '../../lib/sexualActivity';
 import { mucusByDate } from '../../lib/mucusTracking';
-import { bleedingMarks, latestPeriodSummary, periodPreviewLines } from '../../lib/periodTracking';
+import { bleedingMarks } from '../../lib/periodTracking';
+import { buildPeriodRecords, calendarTrackingCard } from '../../lib/periodLength';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -63,8 +64,11 @@ export default function CalendarScreen() {
     }
   };
 
-  // "Period started Oct 7 / 4 bleeding days logged" - from logged bleeding days only
-  const preview = useMemo(() => periodPreviewLines(latestPeriodSummary(viva.dailyLogs)), [viva.dailyLogs]);
+  // Contextual card: only while a period is being tracked (or one quiet line before the first period)
+  const card = useMemo(
+    () => calendarTrackingCard(buildPeriodRecords(viva.dailyLogs, today), viva.dailyLogs, today),
+    [viva.dailyLogs, today]
+  );
 
   const goToday = () => {
     setYear(todayDate.getFullYear());
@@ -141,28 +145,32 @@ export default function CalendarScreen() {
             onToday={goToday}
           />
 
+          {(card || tapMessage) && (
           <View style={styles.trackBlock}>
+            {card && card.kind === 'start' ? <Text style={styles.startHint}>{card.text}</Text> : null}
+            {card && card.kind === 'tracking' ? (
             <View style={styles.trackCard} accessible accessibilityRole="text">
               <View style={styles.trackIcon}>
                 <Ionicons name="water" size={16} color={colors.magenta} />
               </View>
               <View style={styles.trackTextWrap}>
-                <Text style={styles.trackTitle}>Track your period</Text>
-                <Text style={styles.trackText}>Tap each day you have bleeding to record your period length.</Text>
-                {preview && (
-                  <View style={styles.preview}>
-                    <Text style={styles.previewStrong}>{preview[0]}</Text>
-                    <Text style={styles.previewText}>{preview[1]}</Text>
-                  </View>
-                )}
+                <Text style={styles.trackTitle}>{card.heading}</Text>
+                <Text style={styles.trackText}>{card.text}</Text>
+                <View style={styles.preview}>
+                  <Text style={styles.previewStrong}>{card.started}</Text>
+                  <Text style={styles.previewText}>{card.logged}</Text>
+                  {card.todayPrompt ? <Text style={styles.todayPrompt}>{card.todayPrompt}</Text> : null}
+                </View>
               </View>
             </View>
+            ) : null}
             {tapMessage && (
               <Text style={[styles.tapMessage, tapMessage.error && styles.tapMessageError]} accessibilityLiveRegion="polite">
                 {tapMessage.text}
               </Text>
             )}
           </View>
+          )}
 
           <View>
             <CycleCalendar days={days} onDayPress={(k) => void onDayPress(k)} />
@@ -237,6 +245,8 @@ const styles = StyleSheet.create({
   preview: { marginTop: spacing.sm, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.pinkSoft },
   previewStrong: { fontSize: 13.5, fontWeight: '700', color: colors.navy },
   previewText: { fontSize: 13, color: colors.textSecondary, marginTop: 1 },
+  startHint: { fontSize: 13.5, color: colors.textSecondary, paddingHorizontal: spacing.xs },
+  todayPrompt: { fontSize: 13, fontWeight: '600', color: colors.magentaText, marginTop: 4 },
   tapMessage: { fontSize: 13.5, fontWeight: '600', color: colors.navy, paddingHorizontal: spacing.xs },
   tapMessageError: { color: colors.magentaText },
   section: { gap: spacing.md },

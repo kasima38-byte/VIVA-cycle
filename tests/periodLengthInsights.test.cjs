@@ -50,7 +50,7 @@ async function main() {
   app.store.logPeriod(D(-1)); await settle();
   await app.period.togglePeriodDay(today);
   v = view('12m');
-  check('current period shown, not used for the average', v.average === null && v.statusText === 'No completed period data yet' && v.notes[0] === 'Current period: 2 days logged so far', v.notes);
+  check('current period shown as tracking in progress, not used for the average', v.average === null && v.statusText === 'Tracking in progress' && v.notes[0] === 'Tracking in progress: 2 bleeding days logged so far' && v.notes[1] === 'Complete your bleeding-day tracking to calculate period length.', v.notes);
 
   console.log('TEST 2 / 3 - FOUR DAYS, THEN COMPLETED');
   memory.clear(); app = await load();
@@ -88,7 +88,7 @@ async function main() {
   app.store.logPeriod(D(-30)); await settle();
   await tap(-29, -28);
   await app.period.togglePeriodDay(D(-26));
-  check('Oct 7-9 + Oct 11 style gap -> period length 3, not 5', view('12m').counted[0].recordedDays === 3);
+  check('Oct 7-9 + Oct 11 style gap -> never 5 days; marked incomplete, not averaged', view('12m').inRange[0].recordedDays === 3 && view('12m').inRange[0].hasGap === true && view('12m').counted.length === 0);
 
   console.log('WHEN A PERIOD COMPLETES');
   memory.clear(); app = await load();
@@ -98,7 +98,13 @@ async function main() {
   memory.clear(); app = await load();
   app.store.logPeriod(D(-3)); await settle();
   await app.period.togglePeriodDay(D(-2));
-  check('a full day passed with nothing logged -> completed (2 days)', view('12m').active === null && view('12m').average === 2);
+  check('a day not logged soon after Day 1 -> still in progress (never assumed over)', view('12m').active !== null && view('12m').average === null);
+  await app.store.applyPeriodChanges({ [D(-1)]: 'no' });
+  check('next day marked "no period" -> completed (2 days)', view('12m').active === null && view('12m').average === 2);
+  memory.clear(); app = await load();
+  app.store.logPeriod(D(-10)); await settle();
+  await app.period.togglePeriodDay(D(-9));
+  check('10 days after Day 1 -> completed (2 days)', view('12m').active === null && view('12m').average === 2);
   memory.clear(); app = await load();
   app.store.logPeriod(D(-1)); await settle();
   await app.period.togglePeriodDay(today);
