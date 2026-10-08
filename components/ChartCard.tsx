@@ -12,6 +12,9 @@ type Props = {
   rangeText: string;
   chartLabel: string;
   onSeeDetails?: () => void;
+  statusText?: string;  // replaces "Within / Outside typical range" when given
+  emptyText?: string;   // replaces "No logged data yet" when given
+  notes?: string[];     // small lines under the card (e.g. what the average is based on)
 };
 
 export default function ChartCard({
@@ -23,11 +26,14 @@ export default function ChartCard({
   rangeText,
   chartLabel,
   onSeeDetails,
+  statusText,
+  emptyText,
+  notes,
 }: Props) {
   return (
     <View style={styles.card}>
       <View style={styles.headingRow}>
-        <View>
+        <View style={styles.headingText}>
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.subtitle}>{subtitle}</Text>
         </View>
@@ -51,7 +57,7 @@ export default function ChartCard({
           <Text style={styles.averageLabel}>Average</Text>
           <Text style={styles.averageValue}>{averageText}</Text>
           {withinRange === null ? (
-            <Text style={styles.statusText}>No logged data yet</Text>
+            <Text style={styles.statusText}>{emptyText ?? 'No logged data yet'}</Text>
           ) : (
             <View style={styles.statusRow}>
               <View
@@ -61,13 +67,23 @@ export default function ChartCard({
                 ]}
               />
               <Text style={styles.statusText}>
-                {withinRange ? 'Within typical range' : 'Outside typical range'}
+                {statusText ?? (withinRange ? 'Within typical range' : 'Outside typical range')}
               </Text>
             </View>
           )}
           <Text style={styles.rangeText}>{rangeText}</Text>
         </View>
       </View>
+
+      {notes && notes.length > 0 ? (
+        <View style={styles.notes}>
+          {notes.map((n) => (
+            <Text key={n} style={styles.noteText}>
+              {n}
+            </Text>
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -80,6 +96,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.lg,
   },
+  headingText: { flex: 1, paddingRight: spacing.sm },
   headingRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -108,4 +125,6 @@ const styles = StyleSheet.create({
   dot: { width: 8, height: 8, borderRadius: 4 },
   statusText: { fontSize: 11, color: colors.textSecondary, flexShrink: 1 },
   rangeText: { fontSize: 11, color: colors.textSecondary, marginTop: 2 },
+  notes: { marginTop: spacing.md, gap: 2 },
+  noteText: { fontSize: 12.5, color: colors.textSecondary, lineHeight: 17 },
 });

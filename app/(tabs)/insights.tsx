@@ -2,7 +2,9 @@ import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import BottomSheet from '../../components/BottomSheet';
 import ChartCard from '../../components/ChartCard';
+import { buildPeriodRecords, periodDetailRows, periodLengthView } from '../../lib/periodLength';
 import InsightSummaryCard from '../../components/InsightSummaryCard';
 import SegmentedTabs from '../../components/SegmentedTabs';
 import TipCard from '../../components/TipCard';
@@ -46,8 +48,11 @@ export default function InsightsScreen() {
   const est = useMemo(() => calculateCycle(viva.baseline, viva.periods, today), [viva.baseline, viva.periods, today]);
 
   const cycleAvg = average(records.map((r) => r.cycleLength));
-  const periodRecords = records.filter((r) => r.periodLength !== null);
-  const periodAvg = average(periodRecords.map((r) => r.periodLength as number));
+  // Period Length: from actual logged bleeding days (Calendar), real 3/6/12-month windows
+  const periodsAll = useMemo(() => buildPeriodRecords(dailyLogs, today), [dailyLogs, today]);
+  const periodView = useMemo(() => periodLengthView(periodsAll, range, today), [periodsAll, range, today]);
+  const periodRows = useMemo(() => periodDetailRows(periodView), [periodView]);
+  const [periodDetailsOpen, setPeriodDetailsOpen] = useState(false);
   const regularity = calculateCycleRegularity(records);
   const symptoms = calculateCommonSymptoms(records);
   const mood = calculateMoodPattern(records);
@@ -58,11 +63,6 @@ export default function InsightsScreen() {
     label: r.month,
     value: r.cycleLength,
     current: i === records.length - 1,
-  }));
-  const periodData = periodRecords.map((r, i) => ({
-    label: r.month,
-    value: r.periodLength as number,
-    current: i === periodRecords.length - 1,
   }));
 
   const heroTitle =
@@ -75,7 +75,6 @@ export default function InsightsScreen() {
   // Before any cycle is completed, show what predictions use — clearly labelled
   const usingText = !est ? '-' : est.lengthSource === 'default' ? 'Not known yet' : est.cycleLengthUsed + ' days';
   const cycleAvgText = cycleAvg === null ? usingText : formatAverage(cycleAvg) + ' days';
-  const periodAvgText = periodAvg === null ? '-' : formatAverage(periodAvg) + ' days';
 
   return (
     <View style={styles.root}>
@@ -117,12 +116,16 @@ export default function InsightsScreen() {
 
           <ChartCard
             title="Period Length"
-            subtitle={periodRecords.length ? 'Your last ' + periodRecords.length + ' periods' : 'Log when a period ends to see this'}
-            data={periodData}
-            averageText={periodAvg === null ? '–' : periodAvgText}
-            withinRange={periodAvg === null ? null : isWithin(periodAvg, PERIOD_RANGE)}
+            subtitle={periodView.subtitle}
+            data={periodView.chart}
+            averageText={periodView.averageText}
+            withinRange={periodView.withinRange}
+            statusText={periodView.statusText}
+            emptyText={periodView.statusText}
+            notes={periodView.notes}
             rangeText="(2 - 7 days)"
             chartLabel="Period length chart"
+            onSeeDetails={() => setPeriodDetailsOpen(true)}
           />
 
           <View style={styles.gridRow}>
@@ -146,6 +149,40 @@ export default function InsightsScreen() {
           {personalInsight ? <TipCard title="Insight for You" body={personalInsight} /> : null}
         </ScrollView>
       </SafeAreaView>
+
+      <BottomSheet visible={periodDetailsOpen} title="Period Length" onClose={() => setPeriodDetailsOpen(false)}>
+        <Text style={styles.detailIntro}>
+          Counted from the bleeding days you tap on the Calendar ({rangeLabel}).
+        </Text>
+        <ScrollView style={{ maxHeight: 360 }} nestedScrollEnabled>
+          {periodRows.length === 0 ? (
+            <Text style={styles.detailIntro}>No periods logged in this range yet.</Text>
+          ) : (
+            periodRows.map((r) => (
+              <View
+                key={r.key}
+                style={styles.detailRow}
+                accessible
+                accessibilityLabel={r.dates + ', ' + r.value + (r.note ? '. ' + r.note : '')}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.detailMonth}>{r.month}</Text>
+                  <Text style={styles.detailDates}>{r.dates}</Text>
+                  {r.note ? <Text style={styles.detailNote}>{r.note}</Text> : null}
+                </View>
+                <Text style={styles.detailValue}>{r.value}</Text>
+              </View>
+            ))
+          )}
+        </ScrollView>
+        <View style={styles.detailAverage} accessible accessibilityLabel={'Average ' + periodView.averageText}>
+          <Text style={styles.detailMonth}>Average</Text>
+          <Text style={styles.detailValue}>{periodView.averageText}</Text>
+        </View>
+        <Text style={styles.detailIntro}>
+          {periodView.average === null ? periodView.statusText : periodView.statusText + ' (2–7 days)'}
+        </Text>
+      </BottomSheet>
     </View>
   );
 }
@@ -171,4 +208,26 @@ const styles = StyleSheet.create({
   heroBody: { fontSize: 14.5, color: colors.textSecondary, marginTop: 6 },
   heroNumber: { fontSize: 38, fontWeight: '800', color: colors.magenta, marginTop: 2 },
   gridRow: { flexDirection: 'row', gap: spacing.sm },
+  detailIntro: { fontSize: 13.5, color: colors.textSecondary, lineHeight: 19 },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  detailMonth: { fontSize: 15, fontWeight: '700', color: colors.navy },
+  detailDates: { fontSize: 13, color: colors.textSecondary, marginTop: 1 },
+  detailNote: { fontSize: 12, color: colors.textSecondary, fontStyle: 'italic', marginTop: 2 },
+  detailValue: { fontSize: 15, fontWeight: '700', color: colors.magentaText },
+  detailAverage: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.pinkVerySoft,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginTop: spacing.sm,
+  },
 });
