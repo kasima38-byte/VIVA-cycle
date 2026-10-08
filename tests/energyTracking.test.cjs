@@ -71,8 +71,7 @@ async function main() {
   console.log('DATA INTEGRITY');
   await svc.updateDailyRecord(D(-2), { energy: 'high' });
   check('text like "high" is never stored', rec(D(-2)).energy === null, rec(D(-2)));
-  await svc.updateDailyRecord(D(-3), { energy: 150 });
-  check('out-of-range values are kept within 0-100', rec(D(-3)).energy === 100, rec(D(-3)));
+  check('out-of-range values are refused, never clamped into a reading', (await svc.updateDailyRecord(D(-3), { energy: 150 })) !== 'saved' && rec(D(-3)).energy === null, rec(D(-3)));
   check('future date refused', (await svc.updateDailyRecord(D(1), { energy: 70 })) === 'future');
   check('no record created for the future date', !app.store.getVivaState().dailyLogs[D(1)]);
 
@@ -96,9 +95,9 @@ async function main() {
 
   console.log('INSIGHTS DATA');
   const stats = app.energy.energyStats(app.store.getVivaState().dailyLogs);
-  check('average, highest, lowest (numbers kept)', stats.count === 4 && stats.average === 45 && stats.highest === 100 && stats.highestDate === D(-3) && stats.lowest === 15 && stats.lowestDate === P, stats);
+  check('average, highest, lowest (numbers kept)', stats.count === 3 && stats.average === 26.7 && stats.highest === 45 && stats.highestDate === other && stats.lowest === 15 && stats.lowestDate === P, stats);
   const levels = app.energy.energyLevelCounts(app.store.getVivaState().dailyLogs);
-  check('days per level', eq(levels, { 'Very low': 2, Low: 0, Moderate: 1, High: 0, 'Very high': 1 }), levels);
+  check('days per level', eq(levels, { 'Very low': 2, Low: 0, Moderate: 1, High: 0, 'Very high': 0 }), levels);
 
   console.log('TEST 8 - restart');
   app = freshApp();

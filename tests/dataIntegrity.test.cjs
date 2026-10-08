@@ -76,11 +76,9 @@ async function main() {
   check('Mood back to Not tracked, Energy untouched', rec(today).mood === null && model.fieldSummary(rec(today), 'mood') === 'Not tracked' && rec(today).energy === 70);
 
   console.log('TEST 4 - invalid energy');
-  await svc.updateDailyTrackingField(D(-1), 'energy', 150);
-  check('150 is constrained to 100', rec(D(-1)).energy === 100);
-  await svc.updateDailyTrackingField(D(-1), 'energy', -5);
-  check('-5 is constrained to 0', rec(D(-1)).energy === 0);
-  check('NaN refused', (await svc.updateDailyTrackingField(D(-1), 'energy', NaN)) === 'invalid' && rec(D(-1)).energy === 0);
+  check('150 refused (never clamped into a reading)', (await svc.updateDailyTrackingField(D(-1), 'energy', 150)) === 'invalid' && rec(D(-1)).energy === null);
+  check('-5 refused', (await svc.updateDailyTrackingField(D(-1), 'energy', -5)) === 'invalid' && rec(D(-1)).energy === null);
+  check('NaN refused', (await svc.updateDailyTrackingField(D(-1), 'energy', NaN)) === 'invalid' && rec(D(-1)).energy === null);
   check('text refused', (await svc.updateDailyTrackingField(D(-1), 'energy', 'high')) === 'invalid');
 
   console.log('TEST 5 - symptom duplicates');

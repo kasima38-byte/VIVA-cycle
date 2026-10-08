@@ -162,9 +162,11 @@ function symptomList(v: unknown): string[] | null {
  *  mood/energy/symptoms) into a complete, valid record for that date. */
 export function normalizeRecord(date: string, raw: unknown): DailyTrackingRecord {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  // Energy must be a real 0-100 reading. Anything else is treated as NOT RECORDED -
+  // never clamped into a value she didn't enter (500 must not become "Very high").
   const energy =
-    typeof r.energy === 'number' && Number.isFinite(r.energy)
-      ? Math.round(Math.max(0, Math.min(100, r.energy)))
+    typeof r.energy === 'number' && Number.isFinite(r.energy) && r.energy >= 0 && r.energy <= 100
+      ? Math.round(r.energy)
       : null;
   const mucus = oneOf(MUCUS_OPTIONS, r.cervicalMucus === 'eggWhite' ? 'egg_white' : r.cervicalMucus); // 'eggWhite' = earlier ID
   return {
