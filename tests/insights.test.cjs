@@ -68,7 +68,7 @@ async function main() {
   check('setup: third cycle starts 29 days after the second', dates.addDays(S2, 29) === S3);
   const hist = ins.getCycleHistory();
   check('3 cycles: complete, complete, in progress', eq(hist.map((c) => c.completeness), ['complete', 'complete', 'in_progress']) && eq(hist.map((c) => c.cycleLength), [28, 29, null]));
-  check('period length counted from bleeding days only', eq(hist.map((c) => c.recordedPeriodDays), [4, 5, 2]) && eq(hist.map((c) => c.periodLength), [4, 5, null]));
+  check('period length counted from bleeding days only (a finished period counts even before the next one)', eq(hist.map((c) => c.recordedPeriodDays), [4, 5, 2]) && eq(hist.map((c) => c.periodLength), [4, 5, 2]));
   const l3 = ins.getInsightsForRange('last_3_cycles');
   check('average cycle length 28.5 days', l3.cycles.averageCycleLength === 28.5 && l3.cycles.averageCycleLengthText === '28.5 days');
   check('average period length 4.5 days', l3.cycles.averagePeriodLength === 4.5);

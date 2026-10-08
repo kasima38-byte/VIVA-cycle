@@ -28,7 +28,8 @@ function cached<T>(key: string, make: () => T): T {
 
 /** Every cycle from recorded bleeding days, oldest first. */
 export function getCycleHistory(): CycleSummary[] {
-  return cached('history', () => buildCycleHistory(getVivaState().dailyLogs));
+  const today = getToday();
+  return cached('history:' + today, () => buildCycleHistory(getVivaState().dailyLogs, today));
 }
 
 /** Insights for any two dates (inclusive). Cycles = those starting inside the range. */

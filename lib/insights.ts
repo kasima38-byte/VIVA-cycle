@@ -12,6 +12,7 @@ import { DailyTrackingRecord, FlowValue, MOOD_OPTIONS, MoodValue, energyLabel, l
 import { MOOD_SCALE } from './moodTracking';
 import { MIN_RECORDED_FOR_STATS, cycleStartEpisodes, episodesFromLogs } from './periodTracking';
 import { normalizeSymptomIds } from './symptoms';
+import { buildPeriodRecords } from './periodLength';
 
 // ---------- Central thresholds (adjust here only) ----------
 
@@ -63,8 +64,10 @@ type Logs = Record<string, DailyTrackingRecord>;
 
 /** Every cycle from the recorded bleeding days, oldest first.
  *  "uncertain" = longer than the engine's plausible limit (most likely a missed log). */
-export function buildCycleHistory(logs: Logs): CycleSummary[] {
+export function buildCycleHistory(logs: Logs, today: string): CycleSummary[] {
   const starts = cycleStartEpisodes(episodesFromLogs(logs));
+  // Period length comes from the ONE calculation path (lib/periodLength.ts)
+  const periods = buildPeriodRecords(logs, today);
   return starts.map((ep, i) => {
     const next = starts[i + 1];
     const length = next ? diffDays(next.start, ep.start) : null;
@@ -76,7 +79,7 @@ export function buildCycleHistory(logs: Logs): CycleSummary[] {
       endDate: next ? addDays(next.start, -1) : null,
       cycleLength: completeness === 'complete' ? length : null,
       recordedPeriodDays: ep.recordedDays,
-      periodLength: next && ep.recordedDays >= MIN_RECORDED_FOR_STATS ? ep.recordedDays : null,
+      periodLength: periods[i] && periods[i].countsForAverage ? periods[i].periodLength : null,
       periodLabel: ep.recordedDays === 1 ? '1 bleeding day recorded' : ep.recordedDays + ' bleeding days recorded',
       completeness,
     };

@@ -23,6 +23,7 @@ export type PeriodRecord = {
   recordedDays: number;   // length of the first unbroken run
   loggedInWindow: number; // every bleeding day logged for this period (gaps included)
   hasGap: boolean;        // bleeding logged again after a missing day -> incomplete
+  periodLength: number | null; // logged bleeding days in one unbroken run (null when a day is missing)
   status: 'active' | 'completed';
   countsForAverage: boolean; // completed, no gap, at least 2 days logged
 };
@@ -46,6 +47,7 @@ export function buildPeriodRecords(logs: Logs, today: string): PeriodRecord[] {
       recordedDays: ep.recordedDays,
       loggedInWindow,
       hasGap,
+      periodLength: hasGap ? null : ep.recordedDays,
       status: completed ? 'completed' : 'active',
       countsForAverage: completed && !hasGap && ep.recordedDays >= MIN_RECORDED_FOR_STATS,
     };
