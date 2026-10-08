@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Href, router, useLocalSearchParams } from 'expo-router';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MiniMonthCalendar from '../components/MiniMonthCalendar';
@@ -30,14 +30,18 @@ export default function YearOverviewScreen() {
     [year, viva.periods, est, marks, today]
   );
 
-  const close = () => {
+  // Stable handlers, so a data change never forces every month to redraw
+  const close = useCallback(() => {
     if (router.canGoBack()) router.back();
     else router.replace('/calendar' as Href);
-  };
-  const openMonth = (monthIndex: number) => {
-    setPendingMonth(year, monthIndex);
-    close();
-  };
+  }, []);
+  const openMonth = useCallback(
+    (monthIndex: number) => {
+      setPendingMonth(year, monthIndex);
+      close();
+    },
+    [year, close]
+  );
 
   return (
     <View style={styles.root}>

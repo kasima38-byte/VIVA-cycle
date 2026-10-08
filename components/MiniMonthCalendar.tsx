@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { colors, radius, spacing } from '../constants/theme';
 import { WEEKDAY_INITIALS, buildMiniMonth } from '../lib/yearOverview';
@@ -18,7 +18,7 @@ type Props = {
 const NONE: ReadonlySet<number> = new Set<number>();
 
 /** One compact month: name, M T W T F S S, and its real dates. Used for all 12 months. */
-export default function MiniMonthCalendar({ year, monthIndex, periodDays = NONE, predictedDays = NONE, fertileDays = NONE, ovulationDays = NONE, isCurrentMonth, onPress, style }: Props) {
+function MiniMonthCalendar({ year, monthIndex, periodDays = NONE, predictedDays = NONE, fertileDays = NONE, ovulationDays = NONE, isCurrentMonth, onPress, style }: Props) {
   const month = useMemo(() => buildMiniMonth(year, monthIndex), [year, monthIndex]);
   const count = periodDays.size;
   const predictedCount = [...predictedDays].filter((d) => !periodDays.has(d)).length;
@@ -135,3 +135,23 @@ const styles = StyleSheet.create({
   },
   ovulationText: { color: colors.navy, fontWeight: '800', fontSize: 8.5 },
 });
+
+const sameSet = (a: ReadonlySet<number>, b: ReadonlySet<number>) =>
+  a === b || (a.size === b.size && [...a].every((d) => b.has(d)));
+
+/** Redraw a month only when ITS OWN data changes - the other 11 months stay as they are. */
+function sameMonth(a: Props, b: Props): boolean {
+  return (
+    a.year === b.year &&
+    a.monthIndex === b.monthIndex &&
+    a.isCurrentMonth === b.isCurrentMonth &&
+    a.onPress === b.onPress &&
+    a.style === b.style &&
+    sameSet(a.periodDays ?? NONE, b.periodDays ?? NONE) &&
+    sameSet(a.predictedDays ?? NONE, b.predictedDays ?? NONE) &&
+    sameSet(a.fertileDays ?? NONE, b.fertileDays ?? NONE) &&
+    sameSet(a.ovulationDays ?? NONE, b.ovulationDays ?? NONE)
+  );
+}
+
+export default memo(MiniMonthCalendar, sameMonth);
