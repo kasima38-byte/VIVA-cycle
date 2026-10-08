@@ -237,15 +237,16 @@ async function main() {
   console.log('52 / 53 / 60 / 63 - PRIVACY, ERRORS, CLAIMS, TYPES (whole app)');
   const walk = (dir) => fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(dir + '/' + e.name) : /\.tsx?$/.test(e.name) ? [dir + '/' + e.name] : []));
   const code = ['app', 'components', 'lib', 'constants'].flatMap(walk);
-  const logs = code.filter((f) => /console\.(log|info|debug)\(/.test(read(f)));
-  check('no console.log / info / debug anywhere in the app', logs.length === 0, logs);
+  const logFiles = code.filter((f) => /console\.(log|info|debug)\(/.test(read(f)));
+  check('no console.log / info / debug anywhere in the app', logFiles.length === 0, logFiles);
   const ui = code.filter((f) => f.startsWith('app') || f.startsWith('components'));
   const tech = ui.filter((f) => /['"`][^'"`\n]*(AsyncStorage|TypeError|undefined is|Error code|stack trace)[^'"`\n]*['"`]/.test(read(f)));
   check('no technical error text shown to users', tech.length === 0, tech);
   const claims = ui.concat(['lib/insights.ts']).filter((f) => /you are fertile|you ovulated|your hormones|abnormal|you are pregnant/i.test(read(f)));
   check('no unsupported medical claims in the UI or Insights', claims.length === 0, claims);
   const ours = ['lib/dailyTracking.ts', 'lib/dailyTrackingService.ts', 'lib/useDailyTracking.ts', 'lib/periodTracking.ts', 'lib/periodService.ts', 'lib/flowTracking.ts', 'lib/flowService.ts', 'lib/symptoms.ts', 'lib/symptomService.ts', 'lib/moodTracking.ts', 'lib/energyTracking.ts', 'lib/cervicalMucus.ts', 'lib/mucusTracking.ts', 'lib/mucusService.ts', 'lib/sexualActivity.ts', 'lib/sexualActivityService.ts', 'lib/medications.ts', 'lib/medicationService.ts', 'lib/dailyStorage.ts', 'lib/insights.ts', 'lib/insightsService.ts', 'lib/dailyTrackingSettings.ts', 'lib/dailyTrackingSettingsService.ts', 'lib/useReducedMotion.ts'];
-  const anys = ours.filter((f) => /:\s*any\b|\bas any\b/.test(read(f)));
+  const noComments = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  const anys = ours.filter((f) => /:\s*any\b|\bas any\b/.test(noComments(read(f))));
   check('no "any" types in the Daily Tracking code', anys.length === 0, anys);
 
   console.log('37 / 38 / 39 / 40 - INSIGHTS ACCURACY (fresh data)');

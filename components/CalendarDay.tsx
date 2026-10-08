@@ -3,12 +3,14 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { DayInfo } from '../constants/cycleData';
 import { colors } from '../constants/theme';
 
-type DayProps = DayInfo & { isPredictedPeriod?: boolean; cycleDay?: number | null };
+type DayProps = DayInfo & { isPredictedPeriod?: boolean; cycleDay?: number | null; isPeriodStart?: boolean };
 
 type Props = {
   day: DayProps;
   bandStart?: boolean;
   bandEnd?: boolean;
+  periodJoinLeft?: boolean;  // previous day is also a logged bleeding day
+  periodJoinRight?: boolean; // next day is also a logged bleeding day
   onPress?: (dateKey: string) => void;
 };
 
@@ -19,6 +21,7 @@ function describe(day: DayProps) {
   if (day.isToday) parts.push('today');
   if (day.cycleDay) parts.push('cycle day ' + day.cycleDay);
   if (day.isPeriod) parts.push('logged period');
+  if (day.isPeriodStart) parts.push('period start');
   if (day.isPredictedPeriod) parts.push('predicted period');
   if (day.isOvulation) parts.push('estimated ovulation');
   else if (day.isFertile) parts.push('estimated fertile window');
@@ -26,7 +29,7 @@ function describe(day: DayProps) {
   return parts.join(', ');
 }
 
-export default function CalendarDay({ day, bandStart, bandEnd, onPress }: Props) {
+export default function CalendarDay({ day, bandStart, bandEnd, periodJoinLeft, periodJoinRight, onPress }: Props) {
   const dimmed = !day.isCurrentMonth;
 
   let circleStyle = null;
@@ -59,13 +62,18 @@ export default function CalendarDay({ day, bandStart, bandEnd, onPress }: Props)
       accessibilityLabel={describe(day)}
       accessibilityHint={onPress ? (day.isPeriod ? 'Removes bleeding on this day' : 'Records bleeding on this day') : undefined}
     >
-      <View style={[styles.circleBase, circleStyle]}>
+      {/* Consecutive logged bleeding days are joined into one soft-pink range behind the circles */}
+      {periodJoinLeft ? <View style={[styles.join, styles.joinLeft]} pointerEvents="none" /> : null}
+      {periodJoinRight ? <View style={[styles.join, styles.joinRight]} pointerEvents="none" /> : null}
+      <View style={[styles.circleBase, circleStyle, day.isPeriod && day.isToday && styles.todayOnPeriod]}>
         <Text style={[styles.dayText, { color: textColor }]}>{day.day}</Text>
       </View>
 
       <View style={styles.indicatorRow}>
         {day.isSexLogged ? (
           <Ionicons name="heart" size={10} color={colors.magenta} />
+        ) : day.isPeriodStart ? (
+          <View style={styles.startBar} />
         ) : day.isPeriod ? (
           <View style={styles.dot} />
         ) : null}
@@ -96,6 +104,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   periodCircle: { backgroundColor: colors.magenta },
+  todayOnPeriod: { borderWidth: 2.5, borderColor: colors.navy }, // today stays visible on a period day
+  join: { position: 'absolute', top: 4, height: CIRCLE, width: '50%', backgroundColor: colors.pinkSoft },
+  joinLeft: { left: 0 },
+  joinRight: { right: 0 },
+  startBar: { width: 12, height: 4, borderRadius: 2, backgroundColor: colors.magenta },
   ovulationCircle: { backgroundColor: colors.ovulationPurple },
   predictedCircle: { backgroundColor: colors.pinkSoft, borderWidth: 1, borderColor: colors.magenta + '55' },
   todayCircle: {

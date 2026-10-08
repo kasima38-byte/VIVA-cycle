@@ -40,6 +40,8 @@ export default function CycleCalendar({ days, onDayPress }: Props) {
               day={day}
               bandStart={!week[i - 1]?.isFertile}
               bandEnd={!week[i + 1]?.isFertile}
+              periodJoinLeft={!!day.isPeriod && !!days[w * 7 + i - 1]?.isPeriod}
+              periodJoinRight={!!day.isPeriod && !!days[w * 7 + i + 1]?.isPeriod}
               onPress={onDayPress}
             />
           ))}

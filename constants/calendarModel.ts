@@ -16,6 +16,7 @@ export type DayModel = DayInfo & {
   cycleDay: number | null; // from the engine; null before the first logged period
   flow?: FlowValue | null; // recorded flow / spotting - never makes a day a period day
   cervicalMucus?: MucusValue | null; // recorded observation only - never changes fertile/ovulation days
+  isPeriodStart?: boolean; // first logged bleeding day of a run of consecutive days
 };
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -84,6 +85,7 @@ export function buildCalendarMonth(
     isCurrentMonth: inMonth,
     isToday: dateKey === todayKey,
     isPeriod: confirmedDays.has(dateKey),
+    isPeriodStart: confirmedDays.has(dateKey) && !confirmedDays.has(addDays(dateKey, -1)),
     isPredictedPeriod: predictedDays.has(dateKey) && !confirmedDays.has(dateKey),
     isFertile: fertileDays.has(dateKey),
     isOvulation: ovulationDays.has(dateKey),

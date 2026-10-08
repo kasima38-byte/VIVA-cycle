@@ -64,7 +64,7 @@ export default function ProfileScreen() {
   const confirmLogOut = () => {
     Alert.alert('Log out of VIVA Cycle?', 'Are you sure you want to log out?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Log Out', style: 'destructive', onPress: () => console.log('Log out confirmed') },
+      { text: 'Log Out', style: 'destructive', onPress: () => {} }, // Log out is not built yet (no accounts) - see QA report
     ]);
   };
   

@@ -58,16 +58,23 @@ export async function saveDailyRecord(record: DailyTrackingRecord): Promise<Save
     sexualActivity: existing.sexualActivity,       // lib/sexualActivityService.ts
     medications: existing.medications,             // lib/medicationService.ts
   };
-  if (sameTrackedData(existing, toSave)) return 'unchanged';
+  const clean = normalizeRecord(record.date, toSave);
+  if (sameTrackedData(existing, clean)) return 'unchanged';
 
-  const ok = await putDailyLog(normalizeRecord(record.date, toSave));
+  const ok = await putDailyLog(clean);
   return ok ? 'saved' : 'failed';
 }
 
 /** Change some answers for one date, keeping the rest as saved. */
 export async function updateDailyRecord(date: string, changes: DailyRecordChanges): Promise<SaveResult> {
   if (!isValidDateKey(date)) return 'invalid';
-  return saveDailyRecord({ ...readDailyRecord(date), ...changes, date });
+  const merged = normalizeRecord(date, { ...readDailyRecord(date), ...changes, date });
+  // A value that validation rejected must never be reported as "saved"
+  const mergedFields = merged as unknown as Record<string, unknown>;
+  for (const [k, v] of Object.entries(changes)) {
+    if (v !== null && v !== undefined && mergedFields[k] === null) return 'invalid';
+  }
+  return saveDailyRecord(merged);
 }
 
 /** Remove everything saved for one date. */

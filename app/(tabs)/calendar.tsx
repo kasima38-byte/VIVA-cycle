@@ -1,6 +1,6 @@
 import { sexualActivityDates } from '../../lib/sexualActivity';
 import { mucusByDate } from '../../lib/mucusTracking';
-import { bleedingMarks } from '../../lib/periodTracking';
+import { bleedingMarks, latestPeriodSummary, periodPreviewLines } from '../../lib/periodTracking';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -62,6 +62,9 @@ export default function CalendarScreen() {
       setMonthIndex((m) => m + 1);
     }
   };
+
+  // "Period started Oct 7 / 4 bleeding days logged" - from logged bleeding days only
+  const preview = useMemo(() => periodPreviewLines(latestPeriodSummary(viva.dailyLogs)), [viva.dailyLogs]);
 
   const goToday = () => {
     setYear(todayDate.getFullYear());
@@ -146,6 +149,12 @@ export default function CalendarScreen() {
               <View style={styles.trackTextWrap}>
                 <Text style={styles.trackTitle}>Track your period</Text>
                 <Text style={styles.trackText}>Tap each day you have bleeding to record your period length.</Text>
+                {preview && (
+                  <View style={styles.preview}>
+                    <Text style={styles.previewStrong}>{preview[0]}</Text>
+                    <Text style={styles.previewText}>{preview[1]}</Text>
+                  </View>
+                )}
               </View>
             </View>
             {tapMessage && (
@@ -225,6 +234,9 @@ const styles = StyleSheet.create({
   trackTextWrap: { flex: 1 },
   trackTitle: { fontSize: 15, fontWeight: '700', color: colors.navy },
   trackText: { fontSize: 13, color: colors.textSecondary, marginTop: 2, lineHeight: 18 },
+  preview: { marginTop: spacing.sm, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.pinkSoft },
+  previewStrong: { fontSize: 13.5, fontWeight: '700', color: colors.navy },
+  previewText: { fontSize: 13, color: colors.textSecondary, marginTop: 1 },
   tapMessage: { fontSize: 13.5, fontWeight: '600', color: colors.navy, paddingHorizontal: spacing.xs },
   tapMessageError: { color: colors.magentaText },
   section: { gap: spacing.md },

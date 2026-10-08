@@ -165,3 +165,23 @@ export function recordedPeriodLength(logs: Logs, cycleStart: string): number | n
   const ep = episodesFromLogs(logs).find((e) => e.start === cycleStart);
   return ep && ep.recordedDays >= MIN_RECORDED_FOR_STATS ? ep.recordedDays : null;
 }
+
+// ---------- Calendar preview ----------
+
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** The most recent period (the one that started the latest cycle) and its recorded bleeding days. */
+export function latestPeriodSummary(logs: Logs): { start: string; recordedDays: number } | null {
+  const history = periodLengthHistory(logs);
+  const last = history[history.length - 1];
+  return last ? { start: last.start, recordedDays: last.recordedDays } : null;
+}
+
+/** ["Period started Oct 7", "4 bleeding days logged"] - counted from logged bleeding days only. */
+export function periodPreviewLines(summary: { start: string; recordedDays: number } | null): [string, string] | null {
+  if (!summary) return null;
+  const month = MONTHS_SHORT[Number(summary.start.slice(5, 7)) - 1];
+  const day = Number(summary.start.slice(8, 10));
+  const n = summary.recordedDays;
+  return ['Period started ' + month + ' ' + day, n + (n === 1 ? ' bleeding day logged' : ' bleeding days logged')];
+}
