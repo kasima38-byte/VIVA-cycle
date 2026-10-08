@@ -67,6 +67,7 @@ export default function YearOverviewScreen() {
                 monthIndex={monthIndex}
                 periodDays={monthMarks[monthIndex].period}
                 predictedDays={monthMarks[monthIndex].predicted}
+                fertileDays={monthMarks[monthIndex].fertile}
                 isCurrentMonth={monthIndex === currentMonth}
                 onPress={openMonth}
                 style={styles.cell}

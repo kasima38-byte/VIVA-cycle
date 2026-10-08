@@ -8,6 +8,7 @@ type Props = {
   monthIndex: number; // 0-11
   periodDays?: ReadonlySet<number>; // actual logged period days in this month
   predictedDays?: ReadonlySet<number>; // predicted period days (actual always wins)
+  fertileDays?: ReadonlySet<number>; // fertile window days - a band drawn behind, like the Calendar
   isCurrentMonth?: boolean;
   onPress?: (monthIndex: number) => void;
   style?: StyleProp<ViewStyle>;
@@ -16,14 +17,15 @@ type Props = {
 const NONE: ReadonlySet<number> = new Set<number>();
 
 /** One compact month: name, M T W T F S S, and its real dates. Used for all 12 months. */
-export default function MiniMonthCalendar({ year, monthIndex, periodDays = NONE, predictedDays = NONE, isCurrentMonth, onPress, style }: Props) {
+export default function MiniMonthCalendar({ year, monthIndex, periodDays = NONE, predictedDays = NONE, fertileDays = NONE, isCurrentMonth, onPress, style }: Props) {
   const month = useMemo(() => buildMiniMonth(year, monthIndex), [year, monthIndex]);
   const count = periodDays.size;
   const predictedCount = [...predictedDays].filter((d) => !periodDays.has(d)).length;
   const label =
     month.name + ' ' + year +
     (count > 0 ? ', ' + count + (count === 1 ? ' logged period day' : ' logged period days') : '') +
-    (predictedCount > 0 ? ', ' + predictedCount + (predictedCount === 1 ? ' predicted period day' : ' predicted period days') : '');
+    (predictedCount > 0 ? ', ' + predictedCount + (predictedCount === 1 ? ' predicted period day' : ' predicted period days') : '') +
+    (fertileDays.size > 0 ? ', ' + fertileDays.size + (fertileDays.size === 1 ? ' fertile window day' : ' fertile window days') : '');
 
   return (
     <Pressable
@@ -49,8 +51,17 @@ export default function MiniMonthCalendar({ year, monthIndex, periodDays = NONE,
           {week.map((d, di) => {
             const period = d !== null && periodDays.has(d);
             const predicted = !period && d !== null && predictedDays.has(d); // actual always wins
+            // Fertile window: band BEHIND the day (period circles stay on top), joined across neighbours
+            const fertile = d !== null && fertileDays.has(d);
+            const prev = di > 0 ? week[di - 1] : null;
+            const next = di < 6 ? week[di + 1] : null;
+            const joinLeft = fertile && prev !== null && fertileDays.has(prev);
+            const joinRight = fertile && next !== null && fertileDays.has(next);
             return (
-              <View key={wi + '-' + di} style={styles.cell}>
+              <View
+                key={wi + '-' + di}
+                style={[styles.cell, fertile && styles.fertileBand, fertile && !joinLeft && styles.bandStart, fertile && !joinRight && styles.bandEnd]}
+              >
                 <View style={period ? styles.periodMark : predicted ? styles.predictedMark : undefined}>
                   <Text style={[styles.day, period && styles.periodText, predicted && styles.predictedText]} maxFontSizeMultiplier={1.2}>
                     {d === null ? '' : d}
@@ -104,4 +115,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   predictedText: { color: colors.magentaText, fontWeight: '700', fontSize: 8.5 },
+  // Same meaning as the Calendar's fertile window: a lavender band behind the days
+  fertileBand: { backgroundColor: colors.lightPurple },
+  bandStart: { borderTopLeftRadius: 7, borderBottomLeftRadius: 7 },
+  bandEnd: { borderTopRightRadius: 7, borderBottomRightRadius: 7 },
 });
