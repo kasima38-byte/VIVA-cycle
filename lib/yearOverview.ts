@@ -8,6 +8,9 @@ export const MONTH_NAMES = [
 ];
 export const WEEKDAY_INITIALS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
+/** Mini calendars always show 6 week rows so every card in the grid is the same height. */
+export const MINI_WEEK_ROWS = 6;
+
 export function isLeapYear(year: number): boolean {
   return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
 }
@@ -23,23 +26,27 @@ export function mondayLead(year: number, monthIndex: number): number {
 }
 
 export type MiniMonth = {
-  monthIndex: number;
+  year: number;
+  monthIndex: number; // 0-11 - kept so cycle data can be linked to this month later
   name: string;
   days: number;
-  weeks: (number | null)[][]; // rows of 7; null = blank cell
+  weeks: (number | null)[][]; // MINI_WEEK_ROWS rows of 7; null = blank cell
 };
 
+/** One month, generated from its real year and month. */
+export function buildMiniMonth(year: number, monthIndex: number): MiniMonth {
+  const days = daysInMonth(year, monthIndex);
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < mondayLead(year, monthIndex); i++) cells.push(null);
+  for (let d = 1; d <= days; d++) cells.push(d);
+  while (cells.length < MINI_WEEK_ROWS * 7) cells.push(null);
+  const weeks: (number | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  return { year, monthIndex, name: MONTH_NAMES[monthIndex], days, weeks };
+}
+
 export function buildYearOverview(year: number): MiniMonth[] {
-  return MONTH_NAMES.map((name, monthIndex) => {
-    const days = daysInMonth(year, monthIndex);
-    const cells: (number | null)[] = [];
-    for (let i = 0; i < mondayLead(year, monthIndex); i++) cells.push(null);
-    for (let d = 1; d <= days; d++) cells.push(d);
-    while (cells.length % 7 !== 0) cells.push(null);
-    const weeks: (number | null)[][] = [];
-    for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
-    return { monthIndex, name, days, weeks };
-  });
+  return MONTH_NAMES.map((_, monthIndex) => buildMiniMonth(year, monthIndex));
 }
 
 /** The year passed to the screen, or the fallback when missing or not a sensible year. */

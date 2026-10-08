@@ -60,7 +60,7 @@ const selector = read('components/MonthSelector.tsx');
 check('month pill opens the Year Overview for the shown year', calScreen.includes("onLabelPress={() => router.push(('/year-overview?year=' + year) as Href)}") && selector.includes('onPress={onLabelPress}'));
 check('pill stays a plain label on screens that do not ask for it', selector.includes('disabled={!onLabelPress}'));
 check('back control and month cards return to the Calendar', screen.includes('accessibilityLabel="Back to calendar"') && screen.includes('setPendingMonth(year, monthIndex)') && calScreen.includes('takePendingMonth()'));
-check('months generated from date logic (no hard-coded dates)', screen.includes('buildYearOverview(year)') && !/['"]20\d\d-\d\d-\d\d['"]/.test(screen + read('lib/yearOverview.ts')));
+check('months generated from date logic (no hard-coded dates)', read('components/MiniMonthCalendar.tsx').includes('buildMiniMonth(year, monthIndex)') && !/['"]20\d\d-\d\d-\d\d['"]/.test(screen + read('lib/yearOverview.ts')));
 check('no cycle markers yet (by design for this prompt)', !/isPeriod|isFertile|isOvulation|calculateCycle|bleeding/i.test(screen + read('lib/yearOverview.ts')));
 check('the detailed calendar arrows and Today are unchanged', calScreen.includes('onPrevMonth={goPrevMonth}') && calScreen.includes('onNextMonth={goNextMonth}') && calScreen.includes('onToday={goToday}'));
 
