@@ -8,6 +8,15 @@ export const MONTH_NAMES = [
 ];
 export const WEEKDAY_INITIALS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
+/** Years the Year Overview can show. */
+export const MIN_YEAR = 1900;
+export const MAX_YEAR = 2200;
+
+/** The year before (-1) or after (+1), kept within MIN_YEAR..MAX_YEAR. */
+export function stepYear(year: number, delta: number): number {
+  return Math.min(MAX_YEAR, Math.max(MIN_YEAR, year + delta));
+}
+
 /** Mini calendars always show 6 week rows so every card in the grid is the same height. */
 export const MINI_WEEK_ROWS = 6;
 
@@ -52,5 +61,5 @@ export function buildYearOverview(year: number): MiniMonth[] {
 /** The year passed to the screen, or the fallback when missing or not a sensible year. */
 export function parseYearParam(raw: string | string[] | undefined, fallback: number): number {
   const value = Number(Array.isArray(raw) ? raw[0] : raw);
-  return Number.isInteger(value) && value >= 1900 && value <= 2200 ? value : fallback;
+  return Number.isInteger(value) && value >= MIN_YEAR && value <= MAX_YEAR ? value : fallback;
 }
