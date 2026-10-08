@@ -93,3 +93,15 @@ export async function savePeriodRange(start: string, end: string, replacing?: st
   });
   return apply(changes);
 }
+
+/** Calendar tap: a recorded bleeding day is removed; any other day becomes a bleeding day.
+ *  Uses the same rules as everywhere else (no future days, her only period can't be removed).
+ *  recordedDays = bleeding days now recorded in that period (after adding), for the confirmation. */
+export async function togglePeriodDay(
+  date: string
+): Promise<{ result: PeriodResult; action: 'added' | 'removed'; recordedDays: number | null }> {
+  const wasBleeding = getPeriodInfo(date).status === 'period';
+  const result = wasBleeding ? await removePeriodDay(date) : await markPeriodDay(date);
+  const after = getPeriodInfo(date);
+  return { result, action: wasBleeding ? 'removed' : 'added', recordedDays: after.episode?.recordedDays ?? null };
+}

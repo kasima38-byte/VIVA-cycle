@@ -57,6 +57,7 @@ export default function CalendarDay({ day, bandStart, bandEnd, onPress }: Props)
       ]}
       accessibilityRole="button"
       accessibilityLabel={describe(day)}
+      accessibilityHint={onPress ? (day.isPeriod ? 'Removes bleeding on this day' : 'Records bleeding on this day') : undefined}
     >
       <View style={[styles.circleBase, circleStyle]}>
         <Text style={[styles.dayText, { color: textColor }]}>{day.day}</Text>

@@ -3,8 +3,8 @@ import { mucusByDate } from '../../lib/mucusTracking';
 import { bleedingMarks } from '../../lib/periodTracking';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CalendarLegend from '../../components/CalendarLegend';
 import CycleCalendar from '../../components/CycleCalendar';
@@ -13,7 +13,9 @@ import MonthSelector from '../../components/MonthSelector';
 import SettingsRow from '../../components/SettingsRow';
 import { monthLabel } from '../../constants/cycleData';
 import { buildCalendarMonth } from '../../constants/calendarModel';
-import { colors, spacing } from '../../constants/theme';
+import { colors, radius, spacing } from '../../constants/theme';
+import { formatMonthDay } from '../../lib/dailyTracking';
+import { togglePeriodDay } from '../../lib/periodService';
 import { calculateCycle } from '../../lib/cycleEngine';
 import { useToday } from '../../lib/useToday';
 import { useVivaStore } from '../../lib/vivaStore';
@@ -66,6 +68,55 @@ export default function CalendarScreen() {
     setMonthIndex(todayDate.getMonth());
   };
 
+  // ---------- Tap a day to record (or remove) bleeding ----------
+  // Uses the same bleeding days as Log Period, Daily Tracking, Period History and Insights.
+  const [tapMessage, setTapMessage] = useState<{ text: string; error: boolean } | null>(null);
+  const messageTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tapBusy = useRef(false);
+
+  useEffect(
+    () => () => {
+      if (messageTimer.current) clearTimeout(messageTimer.current);
+    },
+    []
+  );
+
+  const showTapMessage = (text: string, error = false) => {
+    setTapMessage({ text, error });
+    AccessibilityInfo.announceForAccessibility(text);
+    if (messageTimer.current) clearTimeout(messageTimer.current);
+    messageTimer.current = setTimeout(() => setTapMessage(null), error ? 5000 : 3000);
+  };
+
+  const onDayPress = async (dateKey: string) => {
+    if (tapBusy.current) return; // one tap = one change
+    if (dateKey > today) {
+      showTapMessage('Bleeding can only be recorded for today or earlier.', true);
+      return;
+    }
+    tapBusy.current = true;
+    try {
+      const { result, action, recordedDays } = await togglePeriodDay(dateKey);
+      const day = formatMonthDay(dateKey);
+      if (result === 'saved') {
+        if (action === 'removed') showTapMessage('Bleeding removed from ' + day);
+        else
+          showTapMessage(
+            'Bleeding recorded on ' + day +
+              (recordedDays ? ' · ' + recordedDays + (recordedDays === 1 ? ' day recorded' : ' days recorded') : '')
+          );
+      } else if (result === 'lastOne') {
+        showTapMessage("This is your only recorded period day, so it can't be removed here. You can change it in Period History.", true);
+      } else if (result === 'future') {
+        showTapMessage('Bleeding can only be recorded for today or earlier.', true);
+      } else if (result === 'failed' || result === 'invalid') {
+        showTapMessage("Couldn't save. Please try again.", true);
+      }
+    } finally {
+      tapBusy.current = false;
+    }
+  };
+
   return (
     <View style={styles.root}>
       <SafeAreaView style={styles.safe} edges={['top']}>
@@ -87,8 +138,25 @@ export default function CalendarScreen() {
             onToday={goToday}
           />
 
+          <View style={styles.trackBlock}>
+            <View style={styles.trackCard} accessible accessibilityRole="text">
+              <View style={styles.trackIcon}>
+                <Ionicons name="water" size={16} color={colors.magenta} />
+              </View>
+              <View style={styles.trackTextWrap}>
+                <Text style={styles.trackTitle}>Track your period</Text>
+                <Text style={styles.trackText}>Tap each day you have bleeding to record your period length.</Text>
+              </View>
+            </View>
+            {tapMessage && (
+              <Text style={[styles.tapMessage, tapMessage.error && styles.tapMessageError]} accessibilityLiveRegion="polite">
+                {tapMessage.text}
+              </Text>
+            )}
+          </View>
+
           <View>
-            <CycleCalendar days={days} />
+            <CycleCalendar days={days} onDayPress={(k) => void onDayPress(k)} />
             <CalendarLegend />
           </View>
 
@@ -136,6 +204,29 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 4,
   },
+  trackBlock: { gap: spacing.sm },
+  trackCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.pinkVerySoft,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  trackIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.pinkSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trackTextWrap: { flex: 1 },
+  trackTitle: { fontSize: 15, fontWeight: '700', color: colors.navy },
+  trackText: { fontSize: 13, color: colors.textSecondary, marginTop: 2, lineHeight: 18 },
+  tapMessage: { fontSize: 13.5, fontWeight: '600', color: colors.navy, paddingHorizontal: spacing.xs },
+  tapMessageError: { color: colors.magentaText },
   section: { gap: spacing.md },
   sectionHeadingRow: {
     flexDirection: 'row',
