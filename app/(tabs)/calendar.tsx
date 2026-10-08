@@ -1,4 +1,3 @@
-import { sexualActivityDates } from '../../lib/sexualActivity';
 import { mucusByDate } from '../../lib/mucusTracking';
 import { bleedingMarks } from '../../lib/periodTracking';
 import { buildPeriodRecords, calendarTrackingCard } from '../../lib/periodLength';

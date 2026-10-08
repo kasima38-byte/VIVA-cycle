@@ -69,7 +69,7 @@ async function main() {
 
   console.log('TODAY NOT YET LOGGED');
   c = cardOn(D(1));
-  check('"Bleeding today? Tap today to record it." only when today is not logged', c.todayPrompt === 'Bleeding today? Tap today to record it.' && c.heading === 'Track your period' && c.text === 'Tap each day you have bleeding.', c);
+  check('"Bleeding today? Tap today to record it." only when today is not logged', c.todayPrompt === 'Bleeding today? Tap today to record it.' && c.heading === 'Track your period' && c.text === 'Tap each day you have bleeding to record your period length.', c);
   check('no prompt once today is logged', cardOn(today).todayPrompt === null);
 
   console.log('CARD DISAPPEARS WHEN THE PERIOD IS OVER');

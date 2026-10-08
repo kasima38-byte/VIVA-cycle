@@ -175,5 +175,5 @@ export function calendarTrackingCard(records: PeriodRecord[], logs: Logs, today:
   if (todayLogged) {
     return { kind: 'tracking', heading: 'Period tracking', text: 'Today is logged as a bleeding day.', started, logged, todayPrompt: null };
   }
-  return { kind: 'tracking', heading: 'Track your period', text: 'Tap each day you have bleeding.', started, logged, todayPrompt };
+  return { kind: 'tracking', heading: 'Track your period', text: 'Tap each day you have bleeding to record your period length.', started, logged, todayPrompt };
 }
