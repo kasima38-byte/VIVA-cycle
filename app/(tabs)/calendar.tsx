@@ -159,6 +159,12 @@ export default function CalendarScreen() {
             onLabelPress={() => router.push(('/year-overview?year=' + year) as Href)}
           />
 
+
+          <View>
+            <CycleCalendar days={days} onDayPress={(k) => void onDayPress(k)} />
+            <CalendarLegend />
+          </View>
+
           {(card || tapMessage) && (
           <View style={styles.trackBlock}>
             {card && card.kind === 'start' ? <Text style={styles.startHint}>{card.text}</Text> : null}
@@ -185,11 +191,6 @@ export default function CalendarScreen() {
             )}
           </View>
           )}
-
-          <View>
-            <CycleCalendar days={days} onDayPress={(k) => void onDayPress(k)} />
-            <CalendarLegend />
-          </View>
 
           <CycleInsightsSection
             today={today}
