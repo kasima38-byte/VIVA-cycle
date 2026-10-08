@@ -3,6 +3,7 @@ export const colors = {
   navySoft: '#38598F',
   textSecondary: '#4B6390',
   magenta: '#E9006F',
+  magentaText: '#C4005D', // magenta for small text: 5:1+ on white and soft pinks (WCAG AA)
   pinkSoft: '#FCE4F0',
   pinkVerySoft: '#FFF0F7',
   lavender: '#F3E8FF',

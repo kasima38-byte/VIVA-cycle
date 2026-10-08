@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { colors, radius, spacing } from '../constants/theme';
+import { useReducedMotion } from '../lib/useReducedMotion';
 
 export type DateItem = {
   key: string;
@@ -29,12 +30,13 @@ export default function DateSelector({
   dates, selectedKey, onSelect, onPrev, onNext, prevLabel = 'Previous day', nextLabel = 'Next day',
 }: Props) {
   const scrollRef = useRef<ScrollView>(null);
+  const reduceMotion = useReducedMotion();
   const selectedIndex = dates.findIndex((d) => d.key === selectedKey);
 
   // Keep the selected date in view on narrow phones
   useEffect(() => {
     if (selectedIndex >= 0) {
-      scrollRef.current?.scrollTo({ x: Math.max(0, (selectedIndex - 2) * ITEM_WIDTH), animated: true });
+      scrollRef.current?.scrollTo({ x: Math.max(0, (selectedIndex - 2) * ITEM_WIDTH), animated: !reduceMotion });
     }
   }, [selectedIndex]);
 
@@ -70,10 +72,10 @@ export default function DateSelector({
                     selected && styles.dayCircleSelected,
                   ]}
                 >
-                  <Text style={[styles.weekday, date.isFuture && !selected && styles.textFuture, selected && styles.textSelected]}>
+                  <Text maxFontSizeMultiplier={1.3} style={[styles.weekday, date.isFuture && !selected && styles.textFuture, selected && styles.textSelected]}>
                     {date.weekday}
                   </Text>
-                  <Text style={[styles.dayNum, date.isFuture && !selected && styles.textFuture, selected && styles.textSelected]}>
+                  <Text maxFontSizeMultiplier={1.3} style={[styles.dayNum, date.isFuture && !selected && styles.textFuture, selected && styles.textSelected]}>
                     {date.day}
                   </Text>
                 </View>
@@ -143,7 +145,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   textFuture: {
-    opacity: 0.45,
+    color: colors.textSecondary,
   },
   textSelected: {
     color: colors.white,

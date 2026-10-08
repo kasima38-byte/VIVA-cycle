@@ -3,6 +3,7 @@ import { useRef } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../constants/theme';
 import { MOOD_OPTIONS, MoodValue } from '../lib/dailyTracking';
+import { useReducedMotion } from '../lib/useReducedMotion';
 
 export type { MoodValue };
 
@@ -46,8 +47,11 @@ function MoodOption({
   value: MoodValue; label: string; selected: boolean; disabled: boolean; dayLabel: string; onPress: () => void;
 }) {
   const scale = useRef(new Animated.Value(1)).current;
-  const springTo = (to: number) =>
+  const reduceMotion = useReducedMotion();
+  const springTo = (to: number) => {
+    if (reduceMotion) return;
     Animated.spring(scale, { toValue: to, useNativeDriver: true, speed: 40, bounciness: 6 }).start();
+  };
 
   return (
     <Pressable
@@ -120,7 +124,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   labelSelected: {
-    color: colors.magenta,
+    color: colors.magentaText,
     fontWeight: '700',
   },
 });

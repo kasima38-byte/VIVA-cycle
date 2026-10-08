@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
   date: {
     fontSize: 13,
     fontWeight: '600',
-    color: colors.magenta,
+    color: colors.magentaText,
   },
   options: {
     flexDirection: 'row',
@@ -230,6 +230,6 @@ const styles = StyleSheet.create({
   noteLinkText: {
     fontSize: 13.5,
     fontWeight: '700',
-    color: colors.magenta,
+    color: colors.magentaText,
   },
 });

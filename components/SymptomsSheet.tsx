@@ -173,7 +173,7 @@ const Chip = memo(function Chip({
 const styles = StyleSheet.create({
   subtitle: { fontSize: 15, color: colors.textSecondary },
   dateBlock: { marginTop: spacing.xs },
-  dateRel: { fontSize: 13, fontWeight: '700', color: colors.magenta },
+  dateRel: { fontSize: 13, fontWeight: '700', color: colors.magentaText },
   dateText: { fontSize: 20, fontWeight: '700', color: colors.navy, marginTop: 2 },
   summaryRow: {
     flexDirection: 'row',
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
   summary: { flex: 1, fontSize: 14, color: colors.navy, paddingVertical: spacing.sm },
   summaryLabel: { fontWeight: '700' },
   link: { minHeight: 44, justifyContent: 'center', paddingHorizontal: spacing.md },
-  linkText: { fontSize: 14, fontWeight: '700', color: colors.magenta },
+  linkText: { fontSize: 14, fontWeight: '700', color: colors.magentaText },
   scrollContent: { gap: spacing.lg, paddingBottom: spacing.xs },
   section: { gap: spacing.sm },
   sectionTitle: {
@@ -213,5 +213,5 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.85 },
   chipText: { fontSize: 14.5, fontWeight: '600', color: colors.navy },
   chipTextOn: { color: colors.white },
-  error: { fontSize: 13.5, fontWeight: '600', color: colors.magenta, lineHeight: 19 },
+  error: { fontSize: 13.5, fontWeight: '600', color: colors.magentaText, lineHeight: 19 },
 });

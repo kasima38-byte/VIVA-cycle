@@ -125,7 +125,7 @@ export default function SexualActivitySheet({ visible, date, today, onClose, onF
           onPress={() => void run(null, null, 'Entry cleared')}
           style={styles.link}
           accessibilityRole="button"
-          accessibilityLabel="Clear this entry"
+          accessibilityLabel="Clear sexual activity"
           accessibilityHint="Sets this back to not tracked"
         >
           <Text style={styles.linkText}>Clear</Text>
@@ -164,7 +164,7 @@ function Choice({
 const styles = StyleSheet.create({
   subtitle: { fontSize: 15, color: colors.textSecondary },
   dateBlock: { marginTop: spacing.xs, marginBottom: spacing.xs },
-  dateRel: { fontSize: 13, fontWeight: '700', color: colors.magenta },
+  dateRel: { fontSize: 13, fontWeight: '700', color: colors.magentaText },
   dateText: { fontSize: 20, fontWeight: '700', color: colors.navy, marginTop: 2 },
   list: { gap: spacing.sm },
   section: { gap: spacing.xs, marginTop: spacing.xs },
@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: colors.mutedGray,
+    borderColor: colors.toggleOff,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -196,6 +196,6 @@ const styles = StyleSheet.create({
   rowLabel: { flex: 1, fontSize: 16, fontWeight: '600', color: colors.navy },
   rowLabelOn: { fontWeight: '700' },
   link: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingHorizontal: spacing.xs },
-  linkText: { fontSize: 14.5, fontWeight: '700', color: colors.magenta },
-  error: { fontSize: 13.5, fontWeight: '600', color: colors.magenta, lineHeight: 19 },
+  linkText: { fontSize: 14.5, fontWeight: '700', color: colors.magentaText },
+  error: { fontSize: 13.5, fontWeight: '600', color: colors.magentaText, lineHeight: 19 },
 });

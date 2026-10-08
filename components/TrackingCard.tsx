@@ -11,13 +11,15 @@ type Props = {
   fullStatus?: string;   // complete value for screen readers (status may be shortened)
   disabled?: boolean;
   muted?: boolean;       // future date: still tappable, so it can explain why it can't be recorded
+  ref?: React.Ref<React.ComponentRef<typeof View>>; // lets the screen return focus here after a sheet closes
 };
 
 export default function TrackingCard({
-  icon, title, status, onPress, tracked = false, fullStatus, disabled = false, muted = false,
+  icon, title, status, onPress, tracked = false, fullStatus, disabled = false, muted = false, ref,
 }: Props) {
   return (
     <Pressable
+      ref={ref}
       onPress={onPress}
       disabled={disabled}
       style={({ pressed }) => [
@@ -29,7 +31,9 @@ export default function TrackingCard({
       ]}
       accessibilityRole="button"
       accessibilityLabel={title + '. ' + (fullStatus ?? status) + '.'}
-      accessibilityHint={disabled ? undefined : muted ? 'This is a future date' : 'Open ' + title.toLowerCase() + ' tracking'}
+      accessibilityHint={
+        disabled ? undefined : muted ? 'This is a future date' : (tracked ? 'Edit ' : 'Add ') + title.toLowerCase()
+      }
       accessibilityState={{ disabled }}
     >
       <View style={styles.iconCircle}>
@@ -85,7 +89,7 @@ const styles = StyleSheet.create({
   addText: {
     fontSize: 12.5,
     fontWeight: '700',
-    color: colors.magenta,
+    color: colors.magentaText,
   },
   iconCircle: {
     width: 40,

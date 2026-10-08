@@ -11,6 +11,7 @@ import DailyTrackingSheet, { SheetField } from '../components/DailyTrackingSheet
 import PeriodSheet, { recordedText } from '../components/PeriodSheet';
 import { isFieldVisible, trackingProgress } from '../lib/dailyTrackingSettings';
 import { useTrackingSettings } from '../lib/dailyTrackingSettingsService';
+import { useReducedMotion } from '../lib/useReducedMotion';
 import FlowSheet from '../components/FlowSheet';
 import SymptomsSheet from '../components/SymptomsSheet';
 import MucusSheet from '../components/MucusSheet';
@@ -25,6 +26,7 @@ import { colors, radius, spacing } from '../constants/theme';
 import {
   TRACKED_FIELDS, TrackedField, fieldFullText, fieldSummary, formatLongDate, formatMonthDay,
   isTracked, relativeDayName, saveButtonLabel, trackedCount, dateHeader, savedMessage, FUTURE_DATE_MESSAGE,
+  formatFullDate,
   energyLabel,
 } from '../lib/dailyTracking';
 import { SaveResult } from '../lib/dailyTrackingService';
@@ -80,6 +82,7 @@ function resultMessage(result: SaveResult, phrase: string): { text: string; tone
 function useToast() {
   const [toast, setToast] = useState<{ text: string; tone: ToastTone } | null>(null);
   const opacity = useRef(new Animated.Value(0)).current;
+  const reduceMotion = useReducedMotion();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const show = useCallback(
@@ -87,14 +90,14 @@ function useToast() {
       if (timer.current) clearTimeout(timer.current);
       setToast({ text, tone });
       AccessibilityInfo.announceForAccessibility(text);
-      Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: true }).start();
+      Animated.timing(opacity, { toValue: 1, duration: reduceMotion ? 0 : 180, useNativeDriver: true }).start();
       timer.current = setTimeout(() => {
-        Animated.timing(opacity, { toValue: 0, duration: 220, useNativeDriver: true }).start(({ finished }) => {
+        Animated.timing(opacity, { toValue: 0, duration: reduceMotion ? 0 : 220, useNativeDriver: true }).start(({ finished }) => {
           if (finished) setToast(null);
         });
       }, tone === 'error' ? 4000 : 2200);
     },
-    [opacity]
+    [opacity, reduceMotion]
   );
 
   useEffect(() => () => {
@@ -112,6 +115,7 @@ export default function DailyTrackingScreen() {
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const oneColumn = screenWidth < 340; // very narrow phones: one card per row
+  const reduceMotion = useReducedMotion();
   // Settings decide what is SHOWN - recorded data is never changed by them
   const { settings: trackingSettings } = useTrackingSettings();
   const showMood = isFieldVisible(trackingSettings, 'mood');
@@ -141,6 +145,23 @@ export default function DailyTrackingScreen() {
   const [sexOpen, setSexOpen] = useState(false);
   const [medsOpen, setMedsOpen] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+
+  // Screen readers: after a sheet closes, focus returns to the card that opened it
+  const cardRefs = useRef<Partial<Record<TrackedField, React.ComponentRef<typeof View> | null>>>({});
+  const returnFocus = (field: TrackedField) => {
+    setTimeout(() => {
+      const el = cardRefs.current[field];
+      if (el) AccessibilityInfo.sendAccessibilityEvent(el, 'focus');
+    }, 400);
+  };
+
+  // Announce autosave success and failures (not every intermediate state)
+  useEffect(() => {
+    if (justSaved) AccessibilityInfo.announceForAccessibility('Daily Tracking data saved');
+  }, [justSaved]);
+  useEffect(() => {
+    if (saveStatus === 'error') AccessibilityInfo.announceForAccessibility("Couldn't save your changes. Use Try Again.");
+  }, [saveStatus]);
   const stickyHeight = useRef(0);
   const sectionY = useRef({ mood: 0, energy: 0 });
 
@@ -227,7 +248,7 @@ export default function DailyTrackingScreen() {
     }
     if (field === 'mood' || field === 'energy') {
       const y = sectionY.current[field] - stickyHeight.current - spacing.md;
-      scrollRef.current?.scrollTo({ y: Math.max(0, y), animated: true });
+      scrollRef.current?.scrollTo({ y: Math.max(0, y), animated: !reduceMotion });
       return;
     }
     if (field === 'period') {
@@ -293,7 +314,8 @@ export default function DailyTrackingScreen() {
       hasDot: loggedDates.has(key),
       isToday: key === today,
       isFuture: key > today,
-      label: (rel ? rel + ', ' : '') + formatLongDate(key),
+      // "Wednesday, October 7, 2026, today" - selected is announced from accessibilityState
+      label: formatFullDate(key) + (key === today ? ', today' : key > today ? ', future date' : ''),
     };
   });
 
@@ -325,11 +347,11 @@ export default function DailyTrackingScreen() {
   if (!canEdit) {
     status = { icon: 'time-outline', text: "Future dates can't be tracked yet", color: colors.textSecondary, iconColor: colors.textSecondary };
   } else if (saveStatus === 'error') {
-    status = { icon: 'alert-circle', text: "Couldn't save your changes.", color: colors.magenta, iconColor: colors.magenta };
+    status = { icon: 'alert-circle', text: "Couldn't save your changes.", color: colors.magentaText, iconColor: colors.magenta };
   } else if (saving) {
     status = { icon: 'sync-outline', text: 'Saving…', color: colors.textSecondary, iconColor: colors.textSecondary };
   } else if (saveStatus === 'unsaved') {
-    status = { icon: 'ellipse', text: 'Unsaved changes', color: colors.magenta, iconColor: colors.magenta };
+    status = { icon: 'ellipse', text: 'Unsaved changes', color: colors.magentaText, iconColor: colors.magenta };
   } else if (saveStatus === 'saved') {
     status = { icon: 'checkmark-circle', text: savedText(savedAt, today), color: colors.navy, iconColor: colors.green };
   } else {
@@ -341,6 +363,14 @@ export default function DailyTrackingScreen() {
   const buttonText =
     saveStatus === 'error' ? 'Try Again' : saving ? 'Saving…' : justSaved && !dirty ? 'Saved' : buttonLabel;
   const showCheck = canEdit && !dirty && saveStatus === 'saved';
+  const buttonA11y =
+    saveStatus === 'error'
+      ? 'Save failed. Retry saving'
+      : saving
+        ? 'Saving Daily Tracking data'
+        : justSaved && !dirty
+          ? 'Daily Tracking data saved'
+          : buttonLabel;
 
   return (
     <View style={styles.root}>
@@ -413,7 +443,7 @@ export default function DailyTrackingScreen() {
                   onPress={() => handleSelect(today)}
                   style={styles.todayLink}
                   accessibilityRole="button"
-                  accessibilityLabel="Go to today"
+                  accessibilityLabel="Return to today"
                 >
                   <Text style={styles.todayLinkText}>Today</Text>
                 </Pressable>
@@ -422,7 +452,7 @@ export default function DailyTrackingScreen() {
           </View>
 
           {relation === 'future' && (
-            <View style={styles.notice}>
+            <View style={styles.notice} accessible>
               <Ionicons name="time-outline" size={18} color={colors.purpleIcon} />
               <Text style={styles.noticeText}>
                 This day hasn't happened yet. You can track it when it arrives.
@@ -436,6 +466,9 @@ export default function DailyTrackingScreen() {
             {CARDS.filter((c) => isFieldVisible(trackingSettings, c.field)).map((c) => (
               <View key={c.field} style={[styles.gridItem, oneColumn && styles.gridItemFull]}>
                 <TrackingCard
+                  ref={(el) => {
+                    cardRefs.current[c.field] = el;
+                  }}
                   icon={c.icon}
                   title={c.title}
                   status={cardStatus(c.field)}
@@ -557,7 +590,7 @@ export default function DailyTrackingScreen() {
           </View>
         )}
 
-        <View style={styles.statusRow} accessibilityLabel={status.text}>
+        <View style={styles.statusRow} accessible accessibilityLabel={status.text}>
           <Ionicons name={status.icon} size={status.icon === 'ellipse' ? 9 : 15} color={status.iconColor} />
           <Text style={[styles.statusText, { color: status.color }]}>{status.text}</Text>
         </View>
@@ -571,7 +604,7 @@ export default function DailyTrackingScreen() {
             pressed && !buttonDisabled && styles.saveButtonPressed,
           ]}
           accessibilityRole="button"
-          accessibilityLabel={buttonLabel}
+          accessibilityLabel={buttonA11y}
           accessibilityHint={buttonDisabled && canEdit && !saving ? 'No new changes to save' : undefined}
           accessibilityState={{ disabled: buttonDisabled, busy: saving }}
         >
@@ -588,7 +621,10 @@ export default function DailyTrackingScreen() {
         visible={medsOpen}
         date={selectedDate}
         today={today}
-        onClose={() => setMedsOpen(false)}
+        onClose={() => {
+          setMedsOpen(false);
+          returnFocus('medications');
+        }}
         onFeedback={show}
       />
 
@@ -596,7 +632,10 @@ export default function DailyTrackingScreen() {
         visible={sexOpen}
         date={selectedDate}
         today={today}
-        onClose={() => setSexOpen(false)}
+        onClose={() => {
+          setSexOpen(false);
+          returnFocus('sexualActivity');
+        }}
         onFeedback={show}
       />
 
@@ -604,7 +643,10 @@ export default function DailyTrackingScreen() {
         visible={mucusOpen}
         date={selectedDate}
         today={today}
-        onClose={() => setMucusOpen(false)}
+        onClose={() => {
+          setMucusOpen(false);
+          returnFocus('cervicalMucus');
+        }}
         onFeedback={show}
       />
 
@@ -612,7 +654,10 @@ export default function DailyTrackingScreen() {
         visible={symptomsOpen}
         date={selectedDate}
         today={today}
-        onClose={() => setSymptomsOpen(false)}
+        onClose={() => {
+          setSymptomsOpen(false);
+          returnFocus('symptoms');
+        }}
         onFeedback={show}
       />
 
@@ -620,7 +665,10 @@ export default function DailyTrackingScreen() {
         visible={flowOpen}
         date={selectedDate}
         today={today}
-        onClose={() => setFlowOpen(false)}
+        onClose={() => {
+          setFlowOpen(false);
+          returnFocus('flow');
+        }}
         onFeedback={show}
       />
 
@@ -628,7 +676,10 @@ export default function DailyTrackingScreen() {
         visible={periodOpen}
         date={selectedDate}
         today={today}
-        onClose={() => setPeriodOpen(false)}
+        onClose={() => {
+          setPeriodOpen(false);
+          returnFocus('period');
+        }}
         onFeedback={show}
       />
 
@@ -697,7 +748,7 @@ const styles = StyleSheet.create({
   dateLabel: {
     fontSize: 13,
     fontWeight: '700',
-    color: colors.magenta,
+    color: colors.magentaText,
   },
   dateLabelFuture: {
     color: colors.textSecondary,
@@ -708,7 +759,7 @@ const styles = StyleSheet.create({
     color: colors.navy,
   },
   dateName: {
-    color: colors.magenta,
+    color: colors.magentaText,
     fontWeight: '700',
   },
   todayLink: {
@@ -721,7 +772,7 @@ const styles = StyleSheet.create({
   todayLinkText: {
     fontSize: 14,
     fontWeight: '700',
-    color: colors.magenta,
+    color: colors.magentaText,
   },
   notice: {
     flexDirection: 'row',
@@ -782,7 +833,7 @@ const styles = StyleSheet.create({
   },
   bannerButtonText: { fontSize: 14.5, fontWeight: '700', color: colors.white },
   bannerLink: { minHeight: 44, justifyContent: 'center' },
-  bannerLinkText: { fontSize: 14, fontWeight: '700', color: colors.magenta },
+  bannerLinkText: { fontSize: 14, fontWeight: '700', color: colors.magentaText },
   clearLink: {
     alignSelf: 'flex-start',
     minHeight: 44,
@@ -792,7 +843,7 @@ const styles = StyleSheet.create({
   clearLinkText: {
     fontSize: 14,
     fontWeight: '700',
-    color: colors.magenta,
+    color: colors.magentaText,
   },
   footer: {
     paddingHorizontal: spacing.screenH,
@@ -834,7 +885,7 @@ const styles = StyleSheet.create({
     fontSize: 17,
   },
   saveButtonTextDisabled: {
-    color: colors.magenta,
+    color: colors.magentaText,
   },
   toast: {
     position: 'absolute',

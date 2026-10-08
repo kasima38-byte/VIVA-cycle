@@ -145,7 +145,7 @@ export default function MucusSheet({ visible, date, today, onClose, onFeedback }
           onPress={() => void run(null, null, 'Observation cleared')}
           style={styles.link}
           accessibilityRole="button"
-          accessibilityLabel="Clear observation"
+          accessibilityLabel="Clear cervical mucus"
           accessibilityHint="Sets cervical mucus back to not tracked"
         >
           <Text style={styles.linkText}>Clear</Text>
@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   subtitle: { fontSize: 15, color: colors.textSecondary },
   dateBlock: { marginTop: spacing.xs, marginBottom: spacing.xs },
-  dateRel: { fontSize: 13, fontWeight: '700', color: colors.magenta },
+  dateRel: { fontSize: 13, fontWeight: '700', color: colors.magentaText },
   dateText: { fontSize: 20, fontWeight: '700', color: colors.navy, marginTop: 2 },
   list: { gap: spacing.sm },
   option: {
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: colors.mutedGray,
+    borderColor: colors.toggleOff,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -209,6 +209,6 @@ const styles = StyleSheet.create({
   },
   counter: { alignSelf: 'flex-end', fontSize: 12, color: colors.textSecondary },
   link: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingHorizontal: spacing.xs },
-  linkText: { fontSize: 14.5, fontWeight: '700', color: colors.magenta },
-  error: { fontSize: 13.5, fontWeight: '600', color: colors.magenta, lineHeight: 19 },
+  linkText: { fontSize: 14.5, fontWeight: '700', color: colors.magentaText },
+  error: { fontSize: 13.5, fontWeight: '600', color: colors.magentaText, lineHeight: 19 },
 });

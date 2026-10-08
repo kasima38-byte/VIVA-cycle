@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
   thumbUntracked: {
     backgroundColor: colors.white,
     borderWidth: 2,
-    borderColor: colors.mutedGray,
+    borderColor: colors.toggleOff,
   },
   stepButton: {
     width: 34,
@@ -201,15 +201,17 @@ const styles = StyleSheet.create({
   labelsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    gap: 8,
     marginTop: 6,
   },
   labelText: {
+    flexShrink: 1,
     fontSize: 12.5,
     color: colors.textSecondary,
     fontWeight: '500',
   },
   labelActive: {
-    color: colors.magenta,
+    color: colors.magentaText,
     fontWeight: '700',
   },
   labelUntracked: {
