@@ -101,7 +101,7 @@ check('same estimate as the Calendar, recalculated when cycle data changes', scr
 check('each month gets its own predicted days', screen.includes('predictedDays={monthMarks[monthIndex].predicted}'));
 check('only the specific day numbers are styled; actual wins', comp.includes('!period && d !== null && predictedDays.has(d)') && comp.includes('styles.predictedMark'));
 check('predicted look = light pink + outline (distinct from solid actual)', /predictedMark: \{[^}]*backgroundColor: colors\.pinkSoft[^}]*borderColor: colors\.magenta/.test(comp));
-check('no separate ovulation marker yet', !/ovulationMark|ovulationDays/.test(screen + comp));
+check('ovulation marker never replaces a period mark', comp.includes('const ovulation = !period && !predicted'));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);

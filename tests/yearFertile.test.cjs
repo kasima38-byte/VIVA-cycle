@@ -44,7 +44,7 @@ const base = months(28, [{ start: D(-10) }]);
 check('every month: fertile days match the detailed Calendar exactly', sameAsCalendar(base));
 check('fertile windows exist (from the existing engine, nothing hard-coded)', base.some((x) => x.fertile.size > 0));
 check('the estimated ovulation day is inside the window (no gap)', base.every((x) => cellsOf(x).filter((c) => c.isOvulation).every((c) => x.fertile.has(day(c)))));
-check('no separate ovulation marker data', base.every((x) => Object.keys(x).every((k) => !/ovulation/i.test(k))));
+check('ovulation days are also fertile window days (band stays visible behind)', base.every((x) => [...x.ovulation].every((d) => x.fertile.has(d))));
 
 console.log('WITHIN ONE MONTH AND ACROSS TWO MONTHS');
 let crossing = null, within = null;
@@ -91,7 +91,7 @@ const comp = read('components/MiniMonthCalendar.tsx');
 const dayComp = read('components/CalendarDay.tsx');
 check('each month gets its own fertile days', screen.includes('fertileDays={monthMarks[monthIndex].fertile}'));
 check('band drawn behind the day, joined across neighbours', comp.includes('fertile && styles.fertileBand') && comp.includes('fertile && !joinLeft && styles.bandStart'));
-check('period circles stay on top (actual > predicted > fertile)', comp.includes('period ? styles.periodMark : predicted ? styles.predictedMark : undefined'));
+check('period circles stay on top (actual > predicted > fertile)', comp.includes('period ? styles.periodMark : predicted ? styles.predictedMark : ovulation ? styles.ovulationMark : undefined'));
 check('same colour as the detailed Calendar fertile window', comp.includes('backgroundColor: colors.lightPurple') && dayComp.includes('lightPurple'));
 check('screen readers hear the fertile window count', comp.includes("' fertile window days'"));
 

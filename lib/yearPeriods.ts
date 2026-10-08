@@ -3,7 +3,7 @@
 // Reuses the detailed Calendar's own rules: buildCalendarMonth() decides every state, using the
 // same calculateCycle() estimate the Calendar passes in. Each month is checked on its own, so
 // anything running from one month into the next is marked in both.
-// Priority (as on the Calendar): actual period > predicted period > fertile window.
+// Priority (as on the Calendar): actual period > predicted period > ovulation > fertile window.
 
 import { buildCalendarMonth } from '../constants/calendarModel';
 import { MONTH_NAMES } from './yearOverview';
@@ -17,6 +17,7 @@ export type MonthMarks = {
   period: Set<number>;    // actual logged period days
   predicted: Set<number>; // predicted period days (never an actual day)
   fertile: Set<number>;   // estimated fertile window days (incl. the estimated ovulation day, its last day)
+  ovulation: Set<number>; // estimated ovulation day(s) - the Calendar's own isOvulation
 };
 
 /** For each month (0-11): the day numbers in each state, exactly as the Calendar works them out. */
@@ -27,7 +28,8 @@ export function yearCalendarMarks(year: number, periods: Periods, estimate: Esti
     const period = new Set(cells.filter((c) => c.isPeriod).map((c) => dayOf(c.dateKey)));
     const predicted = new Set(cells.filter((c) => c.isPredictedPeriod && !c.isPeriod).map((c) => dayOf(c.dateKey)));
     const fertile = new Set(cells.filter((c) => c.isFertile || c.isOvulation).map((c) => dayOf(c.dateKey)));
-    return { period, predicted, fertile };
+    const ovulation = new Set(cells.filter((c) => c.isOvulation).map((c) => dayOf(c.dateKey)));
+    return { period, predicted, fertile, ovulation };
   });
 }
 
