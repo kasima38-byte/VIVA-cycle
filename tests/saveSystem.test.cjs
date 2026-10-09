@@ -1,12 +1,13 @@
 // Save / edit system - Prompt 10 tests, run in the Codespace (no phone needed)
 // Run: npx --yes tsx tests/saveSystem.test.cjs
+const { plain } = require('./support/securityFakes.ts'); // phone security modules (Keychain, AES-GCM) for Node
 const path = require('path');
 const memory = new Map();
 let failing = false; // flip on to simulate the phone failing to save
 const fakeStorage = {
   getItem: async (k) => (memory.has(k) ? memory.get(k) : null),
   setItem: async (k, v) => { if (failing) throw new Error('simulated storage failure'); memory.set(k, v); },
-  removeItem: async (k) => { memory.delete(k); },
+  removeItem: async (k) => { memory.delete(k); }, getAllKeys: async () => [...memory.keys()],
 };
 const asPath = require.resolve('@react-native-async-storage/async-storage');
 require.cache[asPath] = { id: asPath, filename: asPath, loaded: true, exports: { __esModule: true, default: fakeStorage } };
@@ -41,7 +42,7 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const stored = () => {
   // Daily records live in one key per month ("viva-cycle:daily:YYYY-MM")
   const out = {};
-  for (const [k, v] of memory) if (k.startsWith('viva-cycle:daily:')) Object.assign(out, JSON.parse(v));
+  for (const [k, v] of memory) if (k.startsWith('viva-cycle:daily:')) Object.assign(out, JSON.parse(plain(v, k)));
   for (const d of Object.keys(out)) { const { schemaVersion: _v, ...r } = out[d]; out[d] = r; }
   return out;
 };

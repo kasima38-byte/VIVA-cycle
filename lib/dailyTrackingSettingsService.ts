@@ -2,7 +2,8 @@
 // Stored under its own key, completely apart from the daily records.
 // Changing a setting never touches recorded data.
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+// Encrypted like every VIVA value (lib/secureStorage.ts)
+import AsyncStorage from './secureStorage';
 import { useSyncExternalStore } from 'react';
 import {
   CORE_SETTINGS, DEFAULT_TRACKING_SETTINGS, DailyTrackingSettings, isSettingKey, normalizeSettings,

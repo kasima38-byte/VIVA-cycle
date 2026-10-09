@@ -1,5 +1,6 @@
 // Daily Tracking Settings - Prompt 14 tests (no phone needed)
 // Run: npx --yes tsx tests/trackingSettings.test.cjs
+require('./support/securityFakes.ts'); // phone security modules (Keychain, AES-GCM) for Node
 const fs = require('fs');
 const path = require('path');
 const memory = new Map();

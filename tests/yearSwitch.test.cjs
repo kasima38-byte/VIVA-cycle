@@ -1,12 +1,13 @@
 // Year Overview - year navigation and edge cases (Prompt 9)
 // Run: npx --yes tsx tests/yearSwitch.test.cjs
+require('./support/securityFakes.ts'); // phone security modules (Keychain, AES-GCM) for Node
 const fs = require('fs');
 const path = require('path');
 const memory = new Map();
 const fakeStorage = {
   getItem: async (k) => (memory.has(k) ? memory.get(k) : null),
   setItem: async (k, v) => { memory.set(k, v); },
-  removeItem: async (k) => { memory.delete(k); },
+  removeItem: async (k) => { memory.delete(k); }, getAllKeys: async () => [...memory.keys()],
 };
 const asPath = require.resolve('@react-native-async-storage/async-storage');
 require.cache[asPath] = { id: asPath, filename: asPath, loaded: true, exports: { __esModule: true, default: fakeStorage } };

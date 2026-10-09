@@ -2,6 +2,7 @@
 // Uses the REAL flow (lib/deleteFlow.ts) and the REAL deletion operation with an in-memory
 // AsyncStorage and a fake notification system. Never touches the phone's data.
 // Run: npx -y tsx tests/privacySecurity.test.ts
+import './support/securityFakes'; // phone security modules (Keychain, AES-GCM) for Node
 const req: any = require; // Node's require (React Native types lack resolve/cache)
 const fs = req('fs');
 const path = req('path');

@@ -6,6 +6,9 @@
 //   viva-cycle:damaged:YYYY-MM  an unreadable month, set aside untouched
 //   viva-cycle:journal        exists only while a multi-key write is in progress
 //   viva-cycle:daily-tracking-settings  which Daily Tracking cards are shown
+//   viva-cycle:encryption     encryption state ({version, state}); holds no personal data
+//
+// Every value except viva-cycle:encryption is stored ENCRYPTED (lib/secureStorage.ts).
 //
 // Every key VIVA Cycle owns starts with APP_KEY_PREFIX. "Delete all my data" relies on that,
 // so any new key MUST use the prefix too.
@@ -20,6 +23,7 @@ export const DAY_PREFIX = 'viva-cycle:daily:';
 export const JOURNAL_KEY = 'viva-cycle:journal';
 export const DAMAGED_PREFIX = 'viva-cycle:damaged:';
 export const SETTINGS_KEY = 'viva-cycle:daily-tracking-settings';
+export const ENCRYPTION_MARKER_KEY = 'viva-cycle:encryption';
 
 /** True for keys that belong to VIVA Cycle (never another app's or library's data). */
 export function isAppKey(key: unknown): key is string {

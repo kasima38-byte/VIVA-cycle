@@ -1,6 +1,7 @@
 // Period Length checks: Calendar bleeding days -> Insights bars + Average.
 // Uses made-up 2030 dates only - never real user data.
 // Run: npx -y tsx tests/periodLength.test.ts
+import './support/securityFakes'; // phone security modules (Keychain, AES-GCM) for Node
 import { buildPeriodRecords, periodLengthView, PeriodRangeKey, periodDetailRows, formatDays } from '../lib/periodLength';
 import { bleedingMarks, derivePeriodLogs } from '../lib/periodTracking';
 import { addDays, calculateCycle, diffDays, predictCycles } from '../lib/cycleEngine';

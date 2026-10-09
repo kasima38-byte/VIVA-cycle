@@ -1,9 +1,10 @@
 // UX polish - Prompt 15 checks (no phone needed; the look itself needs the phone)
 // Run: npx --yes tsx tests/uxPolish.test.cjs
+require('./support/securityFakes.ts'); // phone security modules (Keychain, AES-GCM) for Node
 const fs = require('fs');
 const path = require('path');
 const asPath = require.resolve('@react-native-async-storage/async-storage');
-require.cache[asPath] = { id: asPath, filename: asPath, loaded: true, exports: { __esModule: true, default: { getItem: async () => null, setItem: async () => {}, removeItem: async () => {} } } };
+require.cache[asPath] = { id: asPath, filename: asPath, loaded: true, exports: { __esModule: true, default: { getItem: async () => null, setItem: async () => {}, removeItem: async () => {}, getAllKeys: async () => [] } } };
 const ROOT = path.join(__dirname, '..');
 const model = require('../lib/dailyTracking');
 const dates = require('../constants/dateUtils');

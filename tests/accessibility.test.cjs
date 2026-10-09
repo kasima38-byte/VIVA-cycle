@@ -1,5 +1,6 @@
 // Accessibility - Prompt 16 checks (no phone needed; VoiceOver/TalkBack testing still needs the phone)
 // Run: npx --yes tsx tests/accessibility.test.cjs
+require('./support/securityFakes.ts'); // phone security modules (Keychain, AES-GCM) for Node
 const fs = require('fs');
 const path = require('path');
 const ROOT = path.join(__dirname, '..');

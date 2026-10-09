@@ -1,9 +1,10 @@
 // Dates - Prompt 17. Run under several time zones, e.g.:
 //   TZ=Pacific/Kiritimati npx --yes tsx tests/dateHandling.test.cjs
+require('./support/securityFakes.ts'); // phone security modules (Keychain, AES-GCM) for Node
 const fs = require('fs');
 const path = require('path');
 const asPath = require.resolve('@react-native-async-storage/async-storage');
-require.cache[asPath] = { id: asPath, filename: asPath, loaded: true, exports: { __esModule: true, default: { getItem: async () => null, setItem: async () => {}, removeItem: async () => {} } } };
+require.cache[asPath] = { id: asPath, filename: asPath, loaded: true, exports: { __esModule: true, default: { getItem: async () => null, setItem: async () => {}, removeItem: async () => {}, getAllKeys: async () => [] } } };
 const ROOT = path.join(__dirname, '..');
 const dates = require('../constants/dateUtils');
 const engine = require('../lib/cycleEngine');

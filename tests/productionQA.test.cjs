@@ -1,5 +1,6 @@
 // Production QA - Prompt 17 (data level; the screen itself needs the phone)
 // Run: npx --yes tsx tests/productionQA.test.cjs
+const { plain } = require('./support/securityFakes.ts'); // phone security modules (Keychain, AES-GCM) for Node
 const fs = require('fs');
 const path = require('path');
 const { performance } = require('perf_hooks');
@@ -8,7 +9,7 @@ let failing = false;
 const fakeStorage = {
   getItem: async (k) => (memory.has(k) ? memory.get(k) : null),
   setItem: async (k, v) => { if (failing) throw new Error('simulated storage failure'); memory.set(k, v); },
-  removeItem: async (k) => { memory.delete(k); },
+  removeItem: async (k) => { memory.delete(k); }, getAllKeys: async () => [...memory.keys()],
 };
 const asPath = require.resolve('@react-native-async-storage/async-storage');
 require.cache[asPath] = { id: asPath, filename: asPath, loaded: true, exports: { __esModule: true, default: fakeStorage } };
@@ -57,7 +58,7 @@ function check(name, ok, detail) {
 const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const DAY = 'viva-cycle:daily:';
 const disk = (d) => {
-  const r = JSON.parse(memory.get(DAY + d.slice(0, 7)) || '{}')[d];
+  const r = JSON.parse(plain(memory.get(DAY + d.slice(0, 7)), DAY + d.slice(0, 7)) || '{}')[d];
   if (!r) return null;
   const { schemaVersion: _v, ...rest } = r;
   return rest;
@@ -93,7 +94,7 @@ async function main() {
   await Promise.all([S(d7, 'mood', 'great'), S(d7, 'energy', 75), app.sym.saveSymptoms(d7, ['cramps']), app.flow.saveFlow(d7, 'light')]);
   const r7 = disk(d7);
   check('all four survive (no stale snapshot overwrote another)', r7.mood === 'great' && r7.energy === 75 && eq(r7.symptoms, ['cramps']) && r7.flow === 'light', r7);
-  check('one record per date', Object.keys(JSON.parse(memory.get(DAY + d7.slice(0, 7)))).filter((k) => k === d7).length === 1);
+  check('one record per date', Object.keys(JSON.parse(plain(memory.get(DAY + d7.slice(0, 7)), DAY + d7.slice(0, 7)))).filter((k) => k === d7).length === 1);
 
   console.log('8 / 9 / 10 - MERGE, CLEAR ONE, CLEAR ALL');
   await S(d7, 'mood', 'low');

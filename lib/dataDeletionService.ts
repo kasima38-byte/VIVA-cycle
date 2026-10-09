@@ -11,6 +11,7 @@ import {
 } from './dailyTrackingSettingsService';
 import { cancelAllReminders, syncReminders } from './notifications';
 import { deleteAllStoredData, getVivaState } from './vivaStore';
+import { forgetDataKey } from './encryptionSetup';
 
 let running: Promise<DeleteAllResult> | null = null;
 
@@ -39,6 +40,13 @@ async function run(): Promise<DeleteAllResult> {
   const wiped = await deleteAllStoredData();
 
   if (wiped.ok) {
+    // Every record is gone; now the key too, so no leftover copy anywhere can be decrypted.
+    // A key that won't delete unlocks nothing (there are no records), so this is not a failure.
+    try {
+      await forgetDataKey();
+    } catch {
+      console.warn('VIVA: could not remove the encryption key');
+    }
     resetSettingsAfterDeletion();
     resetProfileExtras();
     return { status: remindersCancelled ? 'deleted' : 'failed', dataDeleted: 'all', remindersCancelled };

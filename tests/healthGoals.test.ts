@@ -1,6 +1,7 @@
 // My Health Goals: route, one canonical goal, persistence, Home visibility rule, safety.
 // REAL store / Home summary / cycle engine, in-memory AsyncStorage.
 // Run: npx -y tsx tests/healthGoals.test.ts
+import { plain } from './support/securityFakes'; // phone security modules (Keychain, AES-GCM) for Node
 const req: any = require; // Node's require
 const fs = req('fs');
 const path = req('path');
@@ -51,7 +52,7 @@ async function seed(goal: string) {
   app = await boot();
   return app;
 }
-const coreGoal = () => JSON.parse(mem.get('viva-cycle:data')!).goal;
+const coreGoal = () => JSON.parse(plain(mem.get('viva-cycle:data'), 'viva-cycle:data')!).goal;
 const records = () => JSON.stringify([...mem.entries()].filter(([k]) => k.startsWith('viva-cycle:daily:')).sort());
 
 let pass = 0, fail = 0;
@@ -172,7 +173,7 @@ function eq(a: unknown, b: unknown, what: string) {
       eq(await app.store.setGoal(bad), false, 'refused ' + JSON.stringify(bad));
     }
     eq([app.store.getVivaState().goal, mem.get('viva-cycle:data')], ['track', before], 'nothing changed');
-    const core = JSON.parse(mem.get('viva-cycle:data')!);
+    const core = JSON.parse(plain(mem.get('viva-cycle:data'), 'viva-cycle:data')!);
     core.goal = 'pregnant';
     mem.set('viva-cycle:data', JSON.stringify(core));
     app = await boot();

@@ -5,7 +5,9 @@
 // Predictions are never stored. Screens get them from calculateCycle()
 // in lib/cycleEngine.ts, so a prediction can never become "confirmed".
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+// Every value is encrypted on its way to the phone (lib/secureStorage.ts)
+import AsyncStorage from './secureStorage';
+import { isEncryptedValue } from './cipher';
 import { useSyncExternalStore } from 'react';
 import {
   CycleBaseline, DateStr, Goal, PeriodLog, PeriodLogResult,
@@ -235,6 +237,9 @@ function parseSaved(raw: string, extraLogs: Record<string, unknown> = {}): VivaD
 async function finishInterruptedWrite(): Promise<void> {
   const journal = await AsyncStorage.getItem(JOURNAL_KEY);
   if (journal === null) return;
+  // A journal that can't be DECRYPTED is not "never started": keep it and stop (load error),
+  // so an interrupted write is never thrown away because a key was unavailable
+  if (isEncryptedValue(journal)) throw new Error('journal unreadable');
   try {
     const { sets, removes } = JSON.parse(journal) as { sets: [string, string][]; removes: string[] };
     for (const [k, v] of sets) await AsyncStorage.setItem(k, v);

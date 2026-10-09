@@ -1,5 +1,6 @@
 // Persistence: the REAL vivaStore + periodService, with an in-memory AsyncStorage.
 // Never touches the phone's data. Run: npx -y tsx tests/persistence.test.ts
+import './support/securityFakes'; // phone security modules (Keychain, AES-GCM) for Node
 import { buildPeriodRecords, periodLengthView } from '../lib/periodLength';
 const req: any = require; // Node's require (React Native types lack resolve/cache)
 

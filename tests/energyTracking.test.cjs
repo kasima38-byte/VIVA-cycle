@@ -1,11 +1,12 @@
 // Energy - Prompt 6 tests, run in the Codespace (no phone needed)
 // Run: npx --yes tsx tests/energyTracking.test.cjs
+require('./support/securityFakes.ts'); // phone security modules (Keychain, AES-GCM) for Node
 const path = require('path');
 const memory = new Map();
 const fakeStorage = {
   getItem: async (k) => (memory.has(k) ? memory.get(k) : null),
   setItem: async (k, v) => { memory.set(k, v); },
-  removeItem: async (k) => { memory.delete(k); },
+  removeItem: async (k) => { memory.delete(k); }, getAllKeys: async () => [...memory.keys()],
 };
 const asPath = require.resolve('@react-native-async-storage/async-storage');
 require.cache[asPath] = { id: asPath, filename: asPath, loaded: true, exports: { __esModule: true, default: fakeStorage } };

@@ -1,6 +1,7 @@
 // My Data: Profile route, summary from real stored records, export content, cancel and failures.
 // REAL store / Calendar service / settings, in-memory AsyncStorage, fake file+share.
 // Run: npx -y tsx tests/myData.test.ts
+import { plain } from './support/securityFakes'; // phone security modules (Keychain, AES-GCM) for Node
 const req: any = require; // Node's require
 const fs = req('fs');
 const path = req('path');
@@ -134,7 +135,7 @@ function eq(a: unknown, b: unknown, what: string) {
   await check('M4. Daily Tracking counts match the records on the phone (after a restart)', async () => {
     const app = await seed();
     const stored: Record<string, any> = {};
-    for (const [k, v] of mem) if (k.startsWith('viva-cycle:daily:') && k !== 'viva-cycle:daily-tracking-settings') Object.assign(stored, JSON.parse(v));
+    for (const [k, v] of mem) if (k.startsWith('viva-cycle:daily:') && k !== 'viva-cycle:daily-tracking-settings') Object.assign(stored, JSON.parse(plain(v, k)!));
     const fields = ['flow', 'symptoms', 'mood', 'energy', 'cervicalMucus', 'sexualActivity', 'medications'];
     const withEntries = Object.values(stored).filter((r: any) => fields.some((f) => r[f] !== null && r[f] !== undefined)).length;
     const bleeding = Object.values(stored).filter((r: any) => r.period === 'yes').length;

@@ -1,5 +1,6 @@
 // Year Overview mini calendars (Prompt 2) - real dates, weekday alignment, one reusable component
 // Run: npx --yes tsx tests/yearMini.test.cjs
+require('./support/securityFakes.ts'); // phone security modules (Keychain, AES-GCM) for Node
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');

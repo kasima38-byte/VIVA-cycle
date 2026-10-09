@@ -1,6 +1,7 @@
 // "Delete all my data" + Clear Daily Tracking Data: the REAL store, settings service, deletion
 // service and notification service, with an in-memory AsyncStorage and a fake notification
 // system. Never touches the phone's data. Run: npx -y tsx tests/dataDeletion.test.ts
+import { plain } from './support/securityFakes'; // phone security modules (Keychain, AES-GCM) for Node
 const req: any = require; // Node's require (React Native types lack resolve/cache)
 const fs = req('fs');
 const path = req('path');
@@ -169,7 +170,7 @@ function ok(cond: unknown, what: string) {
       baseline: { cycleLength: null, periodLength: null, regularity: 'not_sure' } });
     await settle();
     // Corrupt a stored month, then restart: the store sets it aside as damaged
-    const core = JSON.parse(mem.get('viva-cycle:data')!);
+    const core = JSON.parse(plain(mem.get('viva-cycle:data'), 'viva-cycle:data')!);
     core.dailyMonths = [...core.dailyMonths, '2025-06'];
     mem.set('viva-cycle:data', JSON.stringify(core));
     mem.set('viva-cycle:daily:2025-06', 'not json {');
@@ -182,7 +183,7 @@ function ok(cond: unknown, what: string) {
 
   await check('D4. Removes a pending journal and the tracking settings', async () => {
     const app = await seedFullPhone();
-    mem.set('viva-cycle:journal', JSON.stringify({ sets: [['viva-cycle:data', mem.get('viva-cycle:data')]], removes: [] }));
+    mem.set('viva-cycle:journal', JSON.stringify({ sets: [['viva-cycle:data', plain(mem.get('viva-cycle:data'), 'viva-cycle:data')]], removes: [] }));
     await app.del.deleteAllUserData();
     ok(!mem.has('viva-cycle:journal'), 'journal still on the phone');
     ok(!mem.has('viva-cycle:daily-tracking-settings'), 'tracking settings still on the phone');
@@ -281,7 +282,7 @@ function ok(cond: unknown, what: string) {
 
   await check('D7. Deleted data is gone from screen at once and cannot reappear after a restart', async () => {
     let app = await seedFullPhone();
-    mem.set('viva-cycle:journal', JSON.stringify({ sets: [['viva-cycle:data', mem.get('viva-cycle:data')]], removes: [] }));
+    mem.set('viva-cycle:journal', JSON.stringify({ sets: [['viva-cycle:data', plain(mem.get('viva-cycle:data'), 'viva-cycle:data')]], removes: [] }));
     app.profile.updateProfile({ email: 'a@example.com', phone: '+256700000000' });
     eq((await app.del.deleteAllUserData()).status, 'deleted', 'status');
     // In memory, before any restart
@@ -310,7 +311,7 @@ function ok(cond: unknown, what: string) {
     eq(Object.values(logs).map((r: any) => [r.period, r.mood, r.symptoms, r.sexualActivity, r.medications]),
       [['yes', null, null, null, null], ['yes', null, null, null, null], ['yes', null, null, null, null]], 'answers removed');
     eq(vivaKeys().filter((k) => k.startsWith('viva-cycle:damaged:')), [], 'damaged copies left');
-    ok(!/sexualActivity|medications|cramps/.test(mem.get('viva-cycle:data-backup') ?? ''), 'backup holds no tracking answers');
+    ok(!/sexualActivity|medications|cramps/.test(plain(mem.get('viva-cycle:data-backup'), 'viva-cycle:data-backup') ?? ''), 'backup holds no tracking answers');
     ok(mem.has('viva-cycle:data') && mem.has('viva-cycle:daily-tracking-settings'), 'profile and settings kept');
     eq(app.store.getVivaState().periods.map((p: any) => p.start), ['2025-07-01', '2025-08-01'], 'period starts kept');
     eq(await app.tracking.clearAllTrackingData(), 'unchanged', 'nothing left to clear');

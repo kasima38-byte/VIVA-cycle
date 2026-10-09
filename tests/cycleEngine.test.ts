@@ -1,6 +1,7 @@
 // VIVA Cycle — engine, calendar and Home tests (no phone needed)
 // Run with:  npx tsx tests/cycleEngine.test.ts
 // Other time zones:  TZ=Africa/Kampala npx tsx tests/cycleEngine.test.ts
+import './support/securityFakes'; // phone security modules (Keychain, AES-GCM) for Node
 import {
   addDays, applyPeriodCorrection, applyPeriodLog, applyPeriodRemoval, calculateCycle, completedCycles, cycleDayOn,
   CycleBaseline, diffDays, PeriodLog, Regularity,

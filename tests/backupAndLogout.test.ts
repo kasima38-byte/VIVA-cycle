@@ -2,6 +2,7 @@
 // Run: npx -y tsx tests/backupAndLogout.test.ts
 // Set FULL_PREBUILD=1 to also generate the whole android/ project in a temp folder and read the
 // real files (slower; needs network for the Expo template).
+import './support/securityFakes'; // phone security modules (Keychain, AES-GCM) for Node
 const req: any = require; // Node's require
 const fs = req('fs');
 const path = req('path');

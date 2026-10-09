@@ -1,6 +1,7 @@
 // Discreet Notifications: the REAL store, reminder planner and notification service with an
 // in-memory AsyncStorage and a fake notification system. Never touches the phone.
 // Run: npx -y tsx tests/discreetNotifications.test.ts
+import { plain } from './support/securityFakes'; // phone security modules (Keychain, AES-GCM) for Node
 const req: any = require; // Node's require (React Native types lack resolve/cache)
 const fs = req('fs');
 const path = req('path');
@@ -140,7 +141,7 @@ function eq(a: unknown, b: unknown, what: string) {
     eq(await app.store.setDiscreetNotifications(true), true, 'saved');
     app = await boot();
     eq(app.store.getVivaState().discreetNotifications, true, 'on after restart');
-    ok(!mem.has('viva-cycle:daily-tracking-settings') || !/discreet/.test(mem.get('viva-cycle:daily-tracking-settings')!),
+    ok(!mem.has('viva-cycle:daily-tracking-settings') || !/discreet/.test(plain(mem.get('viva-cycle:daily-tracking-settings'), 'viva-cycle:daily-tracking-settings')!),
       'stored with the reminder switches, not the tracking-card settings');
   });
 

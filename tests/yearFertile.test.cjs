@@ -1,11 +1,12 @@
 // Year Overview - fertile window (Prompt 5)
 // Run: npx --yes tsx tests/yearFertile.test.cjs
+require('./support/securityFakes.ts'); // phone security modules (Keychain, AES-GCM) for Node
 const fs = require('fs');
 const path = require('path');
 const asPath = require.resolve('@react-native-async-storage/async-storage');
 const memory = new Map();
 require.cache[asPath] = { id: asPath, filename: asPath, loaded: true, exports: { __esModule: true, default: {
-  getItem: async (k) => (memory.has(k) ? memory.get(k) : null), setItem: async (k, v) => { memory.set(k, v); }, removeItem: async (k) => { memory.delete(k); },
+  getItem: async (k) => (memory.has(k) ? memory.get(k) : null), setItem: async (k, v) => { memory.set(k, v); }, removeItem: async (k) => { memory.delete(k); }, getAllKeys: async () => [...memory.keys()],
 } } };
 console.warn = () => {};
 const ROOT = path.join(__dirname, '..');

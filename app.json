@@ -26,7 +26,13 @@
       "expo-router",
       "expo-status-bar",
       "@react-native-community/datetimepicker",
-      "./plugins/withNoBackup"
+      "./plugins/withNoBackup",
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": false
+        }
+      ]
     ]
   }
 }

@@ -1,5 +1,6 @@
 // Storage architecture - Prompt 12 tests (no phone needed)
 // Run: npx --yes tsx tests/storageArchitecture.test.cjs
+const { plain } = require('./support/securityFakes.ts'); // phone security modules (Keychain, AES-GCM) for Node
 const fs = require('fs');
 const path = require('path');
 const { performance } = require('perf_hooks');
@@ -15,7 +16,7 @@ const fakeStorage = {
     writes.push(k);
     memory.set(k, v);
   },
-  removeItem: async (k) => { writes.push('-' + k); memory.delete(k); },
+  removeItem: async (k) => { writes.push('-' + k); memory.delete(k); }, getAllKeys: async () => [...memory.keys()],
 };
 const asPath = require.resolve('@react-native-async-storage/async-storage');
 require.cache[asPath] = { id: asPath, filename: asPath, loaded: true, exports: { __esModule: true, default: fakeStorage } };
@@ -51,8 +52,8 @@ function check(name, ok, detail) {
 }
 const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const DAY = 'viva-cycle:daily:';
-const core = () => JSON.parse(memory.get('viva-cycle:data') || '{}');
-const bucket = (m) => JSON.parse(memory.get(DAY + m) || '{}');
+const core = () => JSON.parse(plain(memory.get('viva-cycle:data'), 'viva-cycle:data') || '{}');
+const bucket = (m) => JSON.parse(plain(memory.get(DAY + m), DAY + m) || '{}');
 const snap = () => JSON.stringify([...memory.entries()].sort());
 
 async function main() {
@@ -91,7 +92,7 @@ async function main() {
   const bBefore = JSON.stringify(bucket(b.slice(0, 7))[b]);
   await svc.updateDailyTrackingField(a, 'mood', 'okay');
   check('updating one date leaves the other untouched', JSON.stringify(bucket(b.slice(0, 7))[b]) === bBefore && svc.readDailyRecord(b).mood === 'low');
-  const allMatch = [...memory.entries()].filter(([k]) => k.startsWith(DAY)).every(([k, v]) => Object.entries(JSON.parse(v)).every(([d, r]) => r.date === d && d.slice(0, 7) === k.slice(DAY.length)));
+  const allMatch = [...memory.entries()].filter(([k]) => k.startsWith(DAY)).every(([k, v]) => Object.entries(JSON.parse(plain(v, k))).every(([d, r]) => r.date === d && d.slice(0, 7) === k.slice(DAY.length)));
   check('every stored record sits under its own date, in its own month', allMatch);
 
   console.log('TEST 3 - month and range queries');
@@ -160,7 +161,7 @@ async function main() {
   check('records moved into month keys with schemaVersion 1', mx && mx.schemaVersion === 1 && bucket(Y.slice(0, 7))[Y].schemaVersion === 1);
   check('older values converted, nothing lost', mx.mood === 'very_low' && mx.cervicalMucus === 'egg_white' && eq(mx.sexualActivity, { status: 'activity', entries: [{ protection: 'used' }] }) && mx.medications[0].name === 'Iron' && eq(mx.symptoms, ['cramps']) && mx.period === 'yes' && bucket(Y.slice(0, 7))[Y].energy === 40, mx);
   check('profile upgraded to version 3, no records inside', core().version === 3 && !('dailyLogs' in core()) && core().setupComplete === true);
-  check('the old data is kept in the backup key', memory.get('viva-cycle:data-backup') === oldBlob);
+  check('the old data is kept in the backup key', plain(memory.get('viva-cycle:data-backup'), 'viva-cycle:data-backup') === oldBlob);
   writes = [];
   app = await load();
   check('next launch reads the new format without rewriting months', writes.filter((k) => k.startsWith(DAY)).length === 0, writes);
@@ -176,7 +177,7 @@ async function main() {
   check('the app still loads', app.store.getVivaState().loaded && !app.store.getVivaState().loadError);
   const rr = app.svc.readDailyRecord(D(-100));
   check('bad fields ignored, good field kept', rr.flow === 'light' && rr.mood === null && rr.energy === null, rr);
-  check('the unreadable month is set aside untouched, never deleted', memory.get('viva-cycle:damaged:' + m2) === 'not json{');
+  check('the unreadable month is set aside untouched, never deleted', plain(memory.get('viva-cycle:damaged:' + m2), 'viva-cycle:damaged:' + m2) === 'not json{');
 
   console.log('TEST 7 - three years of history');
   memory.clear();

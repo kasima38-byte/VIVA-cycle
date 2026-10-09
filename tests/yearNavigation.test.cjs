@@ -1,5 +1,6 @@
 // Year Overview -> detailed Calendar navigation (Prompt 7)
 // Run: npx --yes tsx tests/yearNavigation.test.cjs
+require('./support/securityFakes.ts'); // phone security modules (Keychain, AES-GCM) for Node
 const fs = require('fs');
 const path = require('path');
 const ROOT = path.join(__dirname, '..');

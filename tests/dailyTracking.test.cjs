@@ -3,13 +3,14 @@
 // Uses the REAL model, services and store. Only the phone's storage is replaced
 // with an in-memory copy, so Test 7 can "restart" by reloading everything from it.
 
+const { plain } = require('./support/securityFakes.ts'); // phone security modules (Keychain, AES-GCM) for Node
 const path = require('path');
 
 const memory = new Map();
 const fakeStorage = {
   getItem: async (k) => (memory.has(k) ? memory.get(k) : null),
   setItem: async (k, v) => { memory.set(k, v); },
-  removeItem: async (k) => { memory.delete(k); },
+  removeItem: async (k) => { memory.delete(k); }, getAllKeys: async () => [...memory.keys()],
 };
 const asPath = require.resolve('@react-native-async-storage/async-storage');
 require.cache[asPath] = { id: asPath, filename: asPath, loaded: true, exports: { __esModule: true, default: fakeStorage } };
@@ -37,7 +38,7 @@ function check(name, ok, detail) {
 const same = (a, b) => JSON.stringify([...(a || [])].sort()) === JSON.stringify([...(b || [])].sort());
 const savedLogs = () => {
   const out = {};
-  for (const [k, v] of memory) if (k.startsWith('viva-cycle:daily:')) Object.assign(out, JSON.parse(v));
+  for (const [k, v] of memory) if (k.startsWith('viva-cycle:daily:')) Object.assign(out, JSON.parse(plain(v, k)));
   return out;
 };
 
