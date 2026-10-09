@@ -1,7 +1,7 @@
 // Period Length checks: Calendar bleeding days -> Insights bars + Average.
 // Uses made-up 2030 dates only - never real user data.
 // Run: npx -y tsx tests/periodLength.test.ts
-import { buildPeriodRecords, periodLengthView, PeriodRangeKey } from '../lib/periodLength';
+import { buildPeriodRecords, periodLengthView, PeriodRangeKey, prefillPeriodDays } from '../lib/periodLength';
 
 type Logs = Record<string, { period: 'yes' | 'no' }>;
 const d = (md: string) => '2030-' + md;
@@ -133,6 +133,26 @@ check('G. See Details lists the same completed periods as the bars (every range)
     const v = view(S443, rg, T);
     eq(v.details.filter((p) => p.countsForAverage).length, v.chart.length, rg);
   });
+});
+
+check('H1. Pre-fill: logged on Day 1 itself -> only Day 1 (no future days)', () => {
+  eq(prefillPeriodDays(d('10-03'), 5, d('10-03'), null, {}), [d('10-03')], 'days');
+});
+
+check('H2. Pre-fill: logged late with Settings 4 -> Day 1 to Day 4', () => {
+  eq(prefillPeriodDays(d('10-03'), 4, d('10-09'), null, {}), days('10', 3, 6).map(d), 'days');
+});
+
+check('H3. Pre-fill: Settings "Not sure" -> Day 1 only', () => {
+  eq(prefillPeriodDays(d('10-03'), null, d('10-09'), null, {}), [d('10-03')], 'days');
+});
+
+check('H4. Pre-fill: stops before the next logged period', () => {
+  eq(prefillPeriodDays(d('09-28'), 7, d('10-09'), d('10-01'), {}), days('09', 28, 30).map(d), 'days');
+});
+
+check('H5. Pre-fill: stops at a day she marked "no period"', () => {
+  eq(prefillPeriodDays(d('10-03'), 5, d('10-09'), null, logs([], ['10-05']) as any), [d('10-03'), d('10-04')], 'days');
 });
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

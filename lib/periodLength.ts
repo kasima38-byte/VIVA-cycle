@@ -190,3 +190,20 @@ export function calendarTrackingCard(records: PeriodRecord[], logs: Logs, today:
   }
   return { kind: 'tracking', heading: 'Track your period', text: 'Tap each day you have bleeding to record your period length.', started, logged, todayPrompt };
 }
+
+// ---------- Log Period pre-fill (pure) ----------
+
+/** Days Log Period marks as bleeding: Day 1 + the usual period length from Settings.
+ *  Never past today, never into the next logged period, and stops at any day she already
+ *  marked "no period". Settings "Not sure" (null) -> Day 1 only. She adjusts on the Calendar. */
+export function prefillPeriodDays(
+  start: string, usualLength: number | null, today: string, nextStart: string | null, logs: Logs
+): string[] {
+  const days = [start];
+  for (let i = 1; usualLength && i < usualLength; i++) {
+    const day = addDays(start, i);
+    if (day > today || (nextStart && day >= nextStart) || logs[day]?.period === 'no') break;
+    days.push(day);
+  }
+  return days;
+}
