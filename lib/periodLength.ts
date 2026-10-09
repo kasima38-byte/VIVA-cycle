@@ -111,21 +111,22 @@ export function periodLengthView(all: PeriodRecord[], range: PeriodRangeKey, tod
   const inRange = periodsInRange(all, range, today);
   const counted = inRange.filter((p) => p.countsForAverage);
   const active = inRange.find((p) => p.status === 'active') ?? null;
-  const average = counted.length > 0
-    ? Math.round((counted.reduce((s, p) => s + p.recordedDays, 0) / counted.length) * 10) / 10
+  // ONE set of periods feeds both the bars and the Average: completed, logged bleeding
+  // episodes only (never active or predicted days). This Cycle: the current period may still
+  // be in progress, so - like the Cycle Length card - it uses her recent completed periods.
+  const chartPeriods = range === 'cycle' ? all.filter((p) => p.countsForAverage).slice(-6) : counted;
+  // Average = arithmetic mean of the same bars, rounded to 1 decimal (4, 4, 3 -> 3.7)
+  const average = chartPeriods.length > 0
+    ? Math.round((chartPeriods.reduce((s, p) => s + p.recordedDays, 0) / chartPeriods.length) * 10) / 10
     : null;
   const status = average === null ? null : periodRangeStatus(average);
   const notes: string[] = [];
   if (active) {
     notes.push('Tracking in progress: ' + bleedingDaysLogged(active.loggedInWindow) + ' so far');
-    if (counted.length === 0) notes.push('Complete your bleeding-day tracking to calculate period length.');
+    if (chartPeriods.length === 0) notes.push('Complete your bleeding-day tracking to calculate period length.');
   }
-  if (counted.length === 1) notes.push('Based on 1 logged period. Log more periods to see your pattern.');
-  else if (counted.length > 1) notes.push('Based on your last ' + counted.length + ' periods');
-  // Bars: completed, logged periods only (never active or predicted days).
-  // This Cycle: the current period may still be in progress, so - like the Cycle Length
-  // card - the bars show her recent completed periods for context. Average is unchanged.
-  const chartPeriods = range === 'cycle' ? all.filter((p) => p.countsForAverage).slice(-6) : counted;
+  if (chartPeriods.length === 1) notes.push('Based on 1 logged period. Log more periods to see your pattern.');
+  else if (chartPeriods.length > 1) notes.push('Based on your last ' + chartPeriods.length + ' periods');
   return {
     inRange,
     counted,
