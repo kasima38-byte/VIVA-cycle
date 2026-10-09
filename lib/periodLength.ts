@@ -153,9 +153,11 @@ export function periodLengthView(all: PeriodRecord[], range: PeriodRangeKey, tod
 
 /** Rows for See Details, newest first. */
 export function periodDetailRows(view: PeriodLengthView) {
+  // Add the year only when the list spans more than one year (e.g. Oct 2025 and Oct 2026)
+  const multiYear = new Set(view.details.map((p) => p.start.slice(0, 4))).size > 1;
   return [...view.details].reverse().map((p) => ({
     key: p.start,
-    month: monthOf(p.start),
+    month: monthOf(p.start) + (multiYear ? ' ' + p.start.slice(0, 4) : ''),
     dates: p.start === p.end && p.loggedInWindow === 1 ? monthDay(p.start) : monthDay(p.start) + ' – ' + monthDay(p.hasGap ? p.dates[p.dates.length - 1] : p.end),
     value: p.status === 'active'
       ? daysText(p.loggedInWindow) + ' so far'

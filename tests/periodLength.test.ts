@@ -237,5 +237,57 @@ check('T7. Completed period is never duplicated (bars or details, every range)',
   });
 });
 
+// ---------- Chart / Average / See Details consistency (U1-U8) ----------
+// Bars, Average and the completed rows of See Details must describe the same periods.
+function agree(v: ReturnType<typeof view>, what: string) {
+  const done = periodDetailRows(v).filter((r) => r.note === null).reverse(); // completed + counted, oldest first
+  eq(done.map((r) => r.value), v.chart.map((c) => c.value + (c.value === 1 ? ' day' : ' days')), what + ': details = bars');
+  eq(v.average, mean1(v.chart.map((c) => c.value)), what + ': average = mean of bars');
+}
+const HIST2 = [...days('07', 1, 4), ...days('08', 1, 4), ...days('09', 1, 3)];
+
+check('U1. Completed 4,4,3 -> bars 4,4,3, Average 3.7, details agree', () => {
+  const v = view(logs(HIST2), '6m', T);
+  eq(bars(v), ['Jul 4', 'Aug 4', 'Sep 3'], 'bars'); eq(v.averageText, '3.7 days', 'average'); agree(v, '6m');
+});
+
+check('U2. Ongoing 2-day episode does not change the Average', () => {
+  const l = logs([...HIST2, '10-03', '10-04']);
+  (['cycle', '6m', '12m'] as PeriodRangeKey[]).forEach((rg) => {
+    const v = view(l, rg, d('10-04'));
+    eq(v.averageText, '3.7 days', rg + ' average'); agree(v, rg);
+  });
+  eq(periodDetailRows(view(l, 'cycle', d('10-04')))[0].value, '2 days so far', 'in-progress row');
+});
+
+check('U3+U4+U6. Every timeframe: bars, Average and details agree', () => {
+  [logs(HIST2), logs([...HIST2, ...days('10', 3, 6)]), logs([...HIST2, '10-03', '10-04'])].forEach((l) =>
+    RANGES.forEach((rg) => agree(view(l, rg, T), rg)));
+  eq(view(logs(HIST2), '3m', T).averageText, '3.5 days', '3m differs from 6m');
+});
+
+check('U5. Calendar correction (remove Aug 4) updates bars, Average and details', () => {
+  const v = view(logs([...days('07', 1, 4), ...days('08', 1, 3), ...days('09', 1, 3)]), '6m', T);
+  eq(bars(v), ['Jul 4', 'Aug 3', 'Sep 3'], 'bars'); eq(v.averageText, '3.3 days', 'average');
+  eq(periodDetailRows(v).find((r) => r.key === d('08-01'))?.value, '3 days', 'Aug row'); agree(v, '6m');
+});
+
+check('U7. Predictions never enter the Average or add a period', () => {
+  const s = state(HIST, d('10-20'));                    // predicted Oct period passed, nothing tapped
+  RANGES.forEach((rg) => {
+    const v = periodLengthView(s.records, rg, s.today, s.est.periodLengthUsed);
+    if (v.chart.some((c) => c.label === 'Oct') || periodDetailRows(v).some((r) => r.month.startsWith('Oct')))
+      throw new Error(rg + ' shows a predicted Oct period');
+  });
+});
+
+check('U8. See Details shows the year when the list spans two years', () => {
+  const l: any = logs([...HIST2, ...days('10', 3, 6)]);
+  ['2029-10-12', '2029-10-13', '2029-10-14', '2029-10-15'].forEach((k) => (l[k] = { period: 'yes' }));
+  const rows = periodDetailRows(view(l, '12m', T));
+  eq(rows.map((r) => r.month), ['Oct 2030', 'Sep 2030', 'Aug 2030', 'Jul 2030', 'Oct 2029'], 'months');
+  eq(periodDetailRows(view(logs(HIST2), '6m', T)).map((r) => r.month), ['Sep', 'Aug', 'Jul'], 'single year: no year shown');
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
