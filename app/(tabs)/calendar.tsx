@@ -66,8 +66,8 @@ export default function CalendarScreen() {
 
   // Contextual card: only while a period is being tracked (or one quiet line before the first period)
   const card = useMemo(
-    () => calendarTrackingCard(buildPeriodRecords(viva.dailyLogs, today), viva.dailyLogs, today),
-    [viva.dailyLogs, today]
+    () => calendarTrackingCard(buildPeriodRecords(viva.dailyLogs, today, viva.baseline.periodLength), viva.dailyLogs, today),
+    [viva.dailyLogs, today, viva.baseline.periodLength]
   );
 
   // Month tapped on the Year Overview: show exactly that year + month.

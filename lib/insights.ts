@@ -64,10 +64,10 @@ type Logs = Record<string, DailyTrackingRecord>;
 
 /** Every cycle from the recorded bleeding days, oldest first.
  *  "uncertain" = longer than the engine's plausible limit (most likely a missed log). */
-export function buildCycleHistory(logs: Logs, today: string): CycleSummary[] {
+export function buildCycleHistory(logs: Logs, today: string, usualLength: number | null = null): CycleSummary[] {
   const starts = cycleStartEpisodes(episodesFromLogs(logs));
   // Period length comes from the ONE calculation path (lib/periodLength.ts)
-  const periods = buildPeriodRecords(logs, today);
+  const periods = buildPeriodRecords(logs, today, usualLength);
   return starts.map((ep, i) => {
     const next = starts[i + 1];
     const length = next ? diffDays(next.start, ep.start) : null;

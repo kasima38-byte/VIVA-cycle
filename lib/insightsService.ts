@@ -29,7 +29,9 @@ function cached<T>(key: string, make: () => T): T {
 /** Every cycle from recorded bleeding days, oldest first. */
 export function getCycleHistory(): CycleSummary[] {
   const today = getToday();
-  return cached('history:' + today, () => buildCycleHistory(getVivaState().dailyLogs, today));
+  // Settings period length decides when a period counts as finished, so it is part of the cache key
+  const usual = getVivaState().baseline.periodLength;
+  return cached('history:' + today + ':' + usual, () => buildCycleHistory(getVivaState().dailyLogs, today, usual));
 }
 
 /** Insights for any two dates (inclusive). Cycles = those starting inside the range. */

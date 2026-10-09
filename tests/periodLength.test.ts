@@ -108,5 +108,32 @@ check('Bars and Average always use the same dataset (every range)', () => {
     }));
 });
 
+check('F1. Settings 4: Oct 3-6 counts once Oct 7 has passed', () => {
+  const r = buildPeriodRecords(logs(days('10', 3, 6)) as any, T, 4);
+  eq(r[0].status, 'completed', 'status'); eq(r[0].countsForAverage, true, 'counts');
+});
+
+check('F2. Settings 5: only Day 1 logged is NOT finished early', () => {
+  const r = buildPeriodRecords(logs(['10-03']) as any, d('10-05'), 5);
+  eq(r[0].status, 'active', 'status');
+});
+
+check('F3. Settings 4: still in progress on the day after the last bleeding day', () => {
+  const r = buildPeriodRecords(logs(days('10', 3, 6)) as any, d('10-07'), 4);
+  eq(r[0].status, 'active', 'status');
+});
+
+check('F4. Oct complete -> 6 Months bars 4,4,3,4 and Average 3.8', () => {
+  const v = periodLengthView(buildPeriodRecords(S443 as any, T, 4), '6m', T);
+  eq(bars(v), ['Jul 4', 'Aug 4', 'Sep 3', 'Oct 4'], 'bars'); eq(v.averageText, '3.8 days', 'average');
+});
+
+check('G. See Details lists the same completed periods as the bars (every range)', () => {
+  RANGES.forEach((rg) => {
+    const v = view(S443, rg, T);
+    eq(v.details.filter((p) => p.countsForAverage).length, v.chart.length, rg);
+  });
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

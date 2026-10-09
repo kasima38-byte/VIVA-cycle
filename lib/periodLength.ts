@@ -29,7 +29,7 @@ export type PeriodRecord = {
 };
 
 /** One record per period (the bleeding that starts each cycle), oldest first. */
-export function buildPeriodRecords(logs: Logs, today: string): PeriodRecord[] {
+export function buildPeriodRecords(logs: Logs, today: string, usualLength: number | null = null): PeriodRecord[] {
   const starts = cycleStartEpisodes(episodesFromLogs(logs));
   const bleeding = bleedingDates(logs);
   return starts.map((ep, i) => {
@@ -39,7 +39,12 @@ export function buildPeriodRecords(logs: Logs, today: string): PeriodRecord[] {
     const loggedInWindow = bleeding.filter((d) => d >= ep.start && d <= limit).length;
     const hasGap = loggedInWindow > ep.recordedDays;
     const markedEnded = logs[addDays(ep.end, 1)]?.period === 'no';
-    const completed = !!next || markedEnded || diffDays(today, ep.start) >= PERIOD_TRACKING_WINDOW_DAYS;
+    // Finished once BOTH the usual length from Settings (counted from Day 1) AND the day after
+    // her last bleeding day have passed. Settings "Not sure" -> the 10-day window still applies.
+    const pastLastDay = diffDays(today, ep.end) >= 2;
+    const pastUsual = usualLength ? diffDays(today, ep.start) >= usualLength : false;
+    const completed = !!next || markedEnded || (pastLastDay && pastUsual)
+      || diffDays(today, ep.start) >= PERIOD_TRACKING_WINDOW_DAYS;
     return {
       start: ep.start,
       end: ep.end,
@@ -104,6 +109,7 @@ export type PeriodLengthView = {
   statusText: string;
   subtitle: string;
   notes: string[];
+  details: PeriodRecord[]; // See Details rows: the bars' periods (+ any in progress)
   chart: { label: string; value: number; current: boolean }[];
 };
 
@@ -127,9 +133,11 @@ export function periodLengthView(all: PeriodRecord[], range: PeriodRangeKey, tod
   }
   if (chartPeriods.length === 1) notes.push('Based on 1 logged period. Log more periods to see your pattern.');
   else if (chartPeriods.length > 1) notes.push('Based on your last ' + chartPeriods.length + ' periods');
+  const details = range === 'cycle' ? [...chartPeriods, ...inRange.filter((p) => !chartPeriods.includes(p))] : inRange;
   return {
     inRange,
     counted,
+    details,
     active,
     average,
     averageText: average === null ? '—' : formatAvg(average) + (average === 1 ? ' day' : ' days'),
@@ -143,7 +151,7 @@ export function periodLengthView(all: PeriodRecord[], range: PeriodRangeKey, tod
 
 /** Rows for See Details, newest first. */
 export function periodDetailRows(view: PeriodLengthView) {
-  return [...view.inRange].reverse().map((p) => ({
+  return [...view.details].reverse().map((p) => ({
     key: p.start,
     month: monthOf(p.start),
     dates: p.start === p.end && p.loggedInWindow === 1 ? monthDay(p.start) : monthDay(p.start) + ' – ' + monthDay(p.hasGap ? p.dates[p.dates.length - 1] : p.end),

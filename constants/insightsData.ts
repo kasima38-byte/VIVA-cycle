@@ -17,9 +17,9 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 
 /** One record per COMPLETED cycle in her confirmed history, oldest first.
  *  Uses the engine's rule: gaps outside 15–90 days (e.g. a forgotten log) are left out. */
-export function buildCycleRecords(periods: PeriodLog[], dailyLogs: Record<string, DailyLog> = {}): CycleRecord[] {
+export function buildCycleRecords(periods: PeriodLog[], dailyLogs: Record<string, DailyLog> = {}, usualPeriod: number | null = null): CycleRecord[] {
   // Period length comes from the ONE calculation path (lib/periodLength.ts)
-  const periodRecs = buildPeriodRecords(dailyLogs, getToday());
+  const periodRecs = buildPeriodRecords(dailyLogs, getToday(), usualPeriod);
   return completedCycles(periods).filter((c) => isPlausibleCycleLength(c.length)).map((c) => {
     const logs = Object.values(dailyLogs).filter(
       (d) => diffDays(d.date, c.start) >= 0 && diffDays(c.nextStart, d.date) > 0

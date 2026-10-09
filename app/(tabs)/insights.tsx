@@ -43,13 +43,13 @@ export default function InsightsScreen() {
   const dailyLogs = viva.dailyLogs;
   const today = useToday();
   // Observed history only: completed cycles between her logged periods
-  const all = useMemo(() => buildCycleRecords(viva.periods, dailyLogs), [viva.periods, dailyLogs]);
+  const all = useMemo(() => buildCycleRecords(viva.periods, dailyLogs, viva.baseline.periodLength), [viva.periods, dailyLogs, viva.baseline.periodLength]);
   const records = useMemo(() => selectRecords(all, range, today), [all, range, today]);
   const est = useMemo(() => calculateCycle(viva.baseline, viva.periods, today), [viva.baseline, viva.periods, today]);
 
   const cycleAvg = average(records.map((r) => r.cycleLength));
   // Period Length: from actual logged bleeding days (Calendar), real 3/6/12-month windows
-  const periodsAll = useMemo(() => buildPeriodRecords(dailyLogs, today), [dailyLogs, today]);
+  const periodsAll = useMemo(() => buildPeriodRecords(dailyLogs, today, viva.baseline.periodLength), [dailyLogs, today, viva.baseline.periodLength]);
   const periodView = useMemo(() => periodLengthView(periodsAll, range, today), [periodsAll, range, today]);
   const periodRows = useMemo(() => periodDetailRows(periodView), [periodView]);
   const [periodDetailsOpen, setPeriodDetailsOpen] = useState(false);
