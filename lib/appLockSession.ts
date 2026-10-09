@@ -8,7 +8,7 @@
 // Fresh-launch locking only: once open, it stays open until the app is closed.
 
 import { useSyncExternalStore } from 'react';
-import { getLockStatus, removeAppLock, verifyPin, type VerifyResult } from './appLock';
+import { getLockStatus, refreshVerifierIfOld, removeAppLock, verifyPin, type VerifyResult } from './appLock';
 
 export type Gate = 'checking' | 'locked' | 'unknown' | 'open';
 type State = { gate: Gate; lockOn: boolean | null };
@@ -56,6 +56,8 @@ export async function unlockWithPin(pin: string): Promise<VerifyResult> {
   if (result.ok) {
     set({ gate: 'open' });
     flushPendingLinks();
+    // A PIN saved with an older round count is re-saved now, in the background (app already open)
+    void refreshVerifierIfOld(pin);
   }
   return result;
 }

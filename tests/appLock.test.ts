@@ -77,7 +77,7 @@ function eq(a: unknown, b: unknown, what: string) {
     const app = await boot();
     eq(await app.lock.setupPin(PIN, PIN), 'saved', 'setup');
     const r = lockRecord();
-    eq([r.v, r.kdf, r.iterations], [1, 'pbkdf2-sha256', 50000], 'verifier shape');
+    eq([r.v, r.kdf, r.iterations], [1, 'pbkdf2-sha256', 10000], 'verifier shape');
     eq([app.lock.fromBase64(r.salt).length, app.lock.fromBase64(r.hash).length], [16, 32], 'salt 16 bytes, hash 32 bytes');
     ok(!JSON.stringify([...keychain.entries()]).includes(PIN), 'PIN stored in plain text');
     ok(!records().includes(PIN), 'PIN in AsyncStorage');
@@ -154,6 +154,29 @@ function eq(a: unknown, b: unknown, what: string) {
     eq(app.session.getAppLockState().gate, 'locked', 'still locked');
     eq((await app.session.unlockWithPin(PIN)).ok, true, 'right PIN');
     eq(app.session.getAppLockState().gate, 'open', 'open');
+  });
+
+  await check('L6b. A PIN saved with the older 50,000-round setting still works, and is re-saved at 10,000 after unlock', async () => {
+    await reset();
+    let app = await boot();
+    await app.lock.setupPin(PIN, PIN);
+    // Turn the stored verifier into one made the old way (50,000 rounds, its own salt)
+    const nodeCrypto = req('crypto');
+    const salt = nodeCrypto.randomBytes(16);
+    const hash = nodeCrypto.pbkdf2Sync(PIN, salt, 50000, 32, 'sha256');
+    const old = { v: 1, kdf: 'pbkdf2-sha256', iterations: 50000, salt: salt.toString('base64'), hash: hash.toString('base64') };
+    keychain.set('viva-cycle.app-lock', JSON.stringify(old));
+    app = await boot();
+    await app.session.initAppLock();
+    eq((await app.session.unlockWithPin(OTHER)).ok, false, 'wrong PIN');
+    eq(lockRecord().iterations, 50000, 'a wrong PIN changes nothing');
+    eq((await app.session.unlockWithPin(PIN)).ok, true, 'old verifier opens');
+    for (let i = 0; i < 330 && lockRecord().iterations !== 10000; i++) await settle(); // background re-save
+    eq(lockRecord().iterations, 10000, 're-saved at the current setting');
+    ok(lockRecord().salt !== old.salt, 'with a new salt');
+    eq((await app.lock.verifyPin(PIN, T0)).ok, true, 'same PIN still works');
+    eq((await app.lock.verifyPin(OTHER, T0 + 1)).ok, false, 'other PINs still refused');
+    eq((await app.lock.refreshVerifierIfOld(OTHER)), false, 'never re-saved from a wrong PIN');
   });
 
   // ---------- 7. Throttling ----------

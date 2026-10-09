@@ -2,6 +2,7 @@
 //
 // What is stored (secure storage only: iPhone Keychain / Android Keystore, this device only):
 //   viva-cycle.app-lock          {v, kdf, iterations, salt, hash}  - a PIN VERIFIER, never the PIN
+//                                (PBKDF2 with PIN_ITERATIONS rounds and a new random salt each save)
 //   viva-cycle.app-lock-attempts {failures, lastFailureAt}        - wrong-PIN counter
 // The verifier is PBKDF2-HMAC-SHA256 (@noble/hashes, audited, pure JS) with a random 16-byte salt.
 //
@@ -19,7 +20,10 @@ import * as SecureStore from 'expo-secure-store';
 import { utf8Encode } from './cipher';
 
 export const PIN_LENGTH = 6;
-export const PIN_ITERATIONS = 50_000; // stored with each verifier, so it can be raised later
+// 10,000 rounds: about a second on an iPhone in Expo Go (50,000 took ~6 s, Oct 2026). For a
+// 6-digit PIN the rounds add little anyway; the Keychain/Keystore and the waits do the real work.
+// Stored with each verifier: a PIN saved with another count is re-saved after the next unlock.
+export const PIN_ITERATIONS = 10_000;
 const LOCK_KEY = 'viva-cycle.app-lock';
 const ATTEMPTS_KEY = 'viva-cycle.app-lock-attempts';
 const OPTIONS: SecureStore.SecureStoreOptions = { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY };
@@ -159,6 +163,24 @@ export async function verifyPin(pin: string, now = Date.now()): Promise<VerifyRe
   } catch {
     console.warn('VIVA: could not check the PIN'); // never log the PIN
     return { ok: false, reason: 'error' };
+  }
+}
+
+/** After a successful unlock: if the stored verifier uses an older round count, save it again with
+ *  the current count (and a new salt). Needs the PIN, which is only available right after she
+ *  entered it, so it runs then. Only ever re-saves the SAME PIN; the lock is never weakened or
+ *  turned off by this. Failure is harmless: the old verifier stays and still works. */
+export async function refreshVerifierIfOld(pin: string): Promise<boolean> {
+  try {
+    const verifier = await readVerifier();
+    if (!verifier || verifier.iterations === PIN_ITERATIONS) return false;
+    const hash = await derive(pin, fromBase64(verifier.salt), verifier.iterations);
+    if (!sameBytes(hash, fromBase64(verifier.hash))) return false; // only for the right PIN
+    await writeVerifier(pin);
+    return true;
+  } catch {
+    console.warn('VIVA: could not update the PIN settings');
+    return false;
   }
 }
 
