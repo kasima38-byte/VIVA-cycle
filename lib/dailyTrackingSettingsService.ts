@@ -7,8 +7,7 @@ import { useSyncExternalStore } from 'react';
 import {
   CORE_SETTINGS, DEFAULT_TRACKING_SETTINGS, DailyTrackingSettings, isSettingKey, normalizeSettings,
 } from './dailyTrackingSettings';
-
-const SETTINGS_KEY = 'viva-cycle:daily-tracking-settings';
+import { SETTINGS_KEY } from './dailyStorage';
 const SETTINGS_VERSION = 1;
 
 export type SettingsResult =
@@ -63,8 +62,10 @@ export function loadTrackingSettings(): Promise<void> {
 }
 
 let chain: Promise<unknown> = Promise.resolve();
+let paused = false; // true while "Delete all my data" runs: nothing may be written
 
 function write(next: DailyTrackingSettings): Promise<SettingsResult> {
+  if (paused) return Promise.resolve('failed');
   const previous = state.settings;
   state = { ...state, settings: next };
   emit();
@@ -105,4 +106,28 @@ export function updateSetting(key: string, value: unknown): Promise<SettingsResu
 export async function resetSettings(): Promise<SettingsResult> {
   if (same(state.settings, DEFAULT_TRACKING_SETTINGS)) return 'unchanged';
   return write({ ...DEFAULT_TRACKING_SETTINGS });
+}
+
+// ---------- Used only by lib/dataDeletionService.ts ----------
+
+/** Stop saving settings and wait for any save already under way. */
+export async function pauseSettingsWrites(): Promise<void> {
+  paused = true;
+  await chain.catch(() => {});
+}
+
+/** After every VIVA key was deleted: back to the defaults in memory. Nothing is written,
+ *  so the phone keeps no settings key until she changes a setting again. */
+export function resetSettingsAfterDeletion(): void {
+  state = { settings: { ...DEFAULT_TRACKING_SETTINGS }, loaded: true };
+  loading = Promise.resolve();
+  paused = false;
+  emit();
+}
+
+/** After a delete that failed or was partial: show what is really still saved. */
+export async function reloadSettingsAfterFailedDeletion(): Promise<void> {
+  paused = false;
+  loading = null;
+  await loadTrackingSettings();
 }

@@ -11,7 +11,7 @@ import { getToday, isValidDateKey } from '../constants/dateUtils';
 import {
   DailyTrackingRecord, TrackedField, canLog, emptyRecord, normalizeRecord, sameTrackedData,
 } from './dailyTracking';
-import { clearTrackingDataKeepPeriods, getVivaState, putDailyLog, removeDailyLog } from './vivaStore';
+import { clearTrackingDataKeepPeriods, getDamagedMonthCount, getVivaState, putDailyLog, removeDailyLog } from './vivaStore';
 import { PeriodResult, removePeriodDay } from './periodService';
 import { monthsBetween } from './dailyStorage';
 
@@ -177,7 +177,12 @@ export function createDailyRecord(date: string): DailyTrackingRecord | null {
 
 // ---------- Clear Daily Tracking data (Settings) ----------
 
-export type ClearSummary = { daysAffected: number; periodDaysKept: number };
+export type ClearSummary = {
+  daysAffected: number;
+  periodDaysKept: number;
+  /** Unreadable months set aside on the phone; clearing removes them too. */
+  damagedMonths: number;
+};
 
 /** What clearing would remove - read only, nothing is changed. */
 export function getClearSummary(): ClearSummary {
@@ -187,12 +192,13 @@ export function getClearSummary(): ClearSummary {
     if (TRACKED_FIELDS.some((f) => f !== 'period' && rec[f] !== null)) daysAffected++;
     if (rec.period !== null) periodDaysKept++;
   }
-  return { daysAffected, periodDaysKept };
+  return { daysAffected, periodDaysKept, damagedMonths: getDamagedMonthCount() };
 }
 
 /** Permanently remove everything recorded in Daily Tracking except period days.
  *  Call only after the user has explicitly confirmed. */
 export async function clearAllTrackingData(): Promise<'saved' | 'unchanged' | 'failed'> {
-  if (getClearSummary().daysAffected === 0) return 'unchanged';
+  const summary = getClearSummary();
+  if (summary.daysAffected === 0 && summary.damagedMonths === 0) return 'unchanged';
   return (await clearTrackingDataKeepPeriods()) ? 'saved' : 'failed';
 }

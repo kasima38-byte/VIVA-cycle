@@ -62,11 +62,12 @@ export default function DailyTrackingSettingsScreen() {
     const result = await clearAllTrackingData();
     setClearing(false);
     setConfirmOpen(false);
-    if (result === 'failed') setError("We couldn't clear your data. Please try again.");
+    if (result === 'failed') setError("We couldn't clear all of your Daily Tracking data. Please try again.");
     else if (result === 'saved') say('Daily Tracking data cleared.');
   };
 
   const days = summary.daysAffected;
+  const nothingToClear = days === 0 && summary.damagedMonths === 0;
 
   return (
     <View style={styles.root}>
@@ -159,18 +160,18 @@ export default function DailyTrackingSettingsScreen() {
                 setMessage(null);
                 setConfirmOpen(true);
               }}
-              disabled={days === 0}
-              style={[styles.row, days === 0 && styles.rowDisabled]}
+              disabled={nothingToClear}
+              style={[styles.row, nothingToClear && styles.rowDisabled]}
               accessibilityRole="button"
               accessibilityLabel="Clear Daily Tracking Data"
-              accessibilityHint={days === 0 ? 'Nothing to clear' : 'Opens a confirmation. Nothing is removed until you confirm.'}
-              accessibilityState={{ disabled: days === 0 }}
+              accessibilityHint={nothingToClear ? 'Nothing to clear' : 'Opens a confirmation. Nothing is removed until you confirm.'}
+              accessibilityState={{ disabled: nothingToClear }}
             >
               <Ionicons name="trash-outline" size={20} color={colors.magenta} />
               <View style={styles.flex}>
                 <Text style={[styles.rowLabel, styles.danger]}>Clear Daily Tracking Data</Text>
                 <Text style={styles.rowNote}>
-                  {days === 0 ? 'Nothing to clear.' : 'Removes what you recorded in Daily Tracking. Period days are kept.'}
+                  {nothingToClear ? 'Nothing to clear.' : 'Removes what you recorded in Daily Tracking. Period days are kept.'}
                 </Text>
               </View>
             </Pressable>
@@ -203,6 +204,12 @@ export default function DailyTrackingSettingsScreen() {
           This will permanently remove what you recorded in Daily Tracking on {days} {days === 1 ? 'day' : 'days'}: flow
           and spotting, symptoms, mood, energy, cervical mucus, sexual activity and medications.
         </Text>
+        {summary.damagedMonths > 0 && (
+          <Text style={styles.confirmText}>
+            It also removes {summary.damagedMonths} saved {summary.damagedMonths === 1 ? 'month' : 'months'} of Daily
+            Tracking that couldn't be read. Any period days inside them can't be recovered.
+          </Text>
+        )}
         <Text style={styles.confirmText}>Your Insights will no longer include this data.</Text>
         <Text style={styles.confirmText}>
           Kept: your period days, so your Calendar, cycle history and cycle statistics stay as they are. To change period

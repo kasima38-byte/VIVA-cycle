@@ -46,6 +46,18 @@ export function updateProfile(patch: Partial<Profile>) {
   }
 }
 
+/** After "Delete all my data": forget the photo, email, phone and units held in memory. */
+export function resetProfileExtras() {
+  extras = {
+    tagline: userProfile.tagline,
+    photoUri: null,
+    email: '',
+    phone: '',
+    units: 'Metric',
+  };
+  listeners.forEach((l) => l());
+}
+
 function subscribe(listener: () => void) {
   listeners.add(listener);
   return () => {

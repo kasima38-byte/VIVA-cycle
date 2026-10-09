@@ -13,14 +13,15 @@ import {
 } from './cycleEngine';
 import { DailyTrackingRecord, hasAnyData, normalizeRecord } from './dailyTracking';
 import { PeriodChanges, derivePeriodLogs, episodesFromLogs } from './periodTracking';
-import { DAMAGED_PREFIX, DAY_PREFIX, JOURNAL_KEY, isMonthKey, migrateRecord, serializeMonths } from './dailyStorage';
+import {
+  BACKUP_KEY, DAMAGED_PREFIX, DATA_KEY as STORAGE_KEY, DAY_PREFIX, JOURNAL_KEY,
+  isAppKey, isMonthKey, migrateRecord, serializeMonths,
+} from './dailyStorage';
 import { isValidDateKey } from '../constants/dateUtils';
 
 /** One day of Daily Tracking (her own entries). Full model: lib/dailyTracking.ts */
 export type DailyLog = DailyTrackingRecord;
 
-const STORAGE_KEY = 'viva-cycle:data';
-const BACKUP_KEY = 'viva-cycle:data-backup'; // last copy that was read successfully
 const SCHEMA_VERSION = 3; // 2: bleeding days are the period data; 3: daily records stored one key per month
 
 export interface VivaData {
@@ -63,6 +64,8 @@ let canSave = false;
 let savedData: VivaData | null = null;
 let savedCore: string | null = null;           // profile text on the phone
 let savedMonths = new Map<string, string>();   // month -> records text on the phone
+// Unreadable months set aside under DAMAGED_PREFIX (they can hold any Daily Tracking answer)
+let damagedKeys = new Set<string>();
 
 // ---------- Subscriptions ----------
 
@@ -261,7 +264,9 @@ async function readMonths(coreRaw: string | null): Promise<{ logs: Record<string
       }
       raw.set(m, text);
     } catch {
-      await AsyncStorage.setItem(DAMAGED_PREFIX + m, text).catch(() => {});
+      await AsyncStorage.setItem(DAMAGED_PREFIX + m, text)
+        .then(() => damagedKeys.add(DAMAGED_PREFIX + m))
+        .catch(() => {});
     }
   }
   return { logs, raw, monthly };
@@ -305,6 +310,12 @@ export function loadVivaStore(): Promise<void> {
           state = { ...EMPTY, loaded: true, loadError: true };
           canSave = false;
         }
+      }
+      // Damaged copies set aside on earlier launches (best effort: only used to offer "Clear")
+      try {
+        for (const k of await AsyncStorage.getAllKeys()) if (k.startsWith(DAMAGED_PREFIX)) damagedKeys.add(k);
+      } catch {
+        // Listing keys is not needed to use the app
       }
       if (canSave) {
         const { loaded: _l, loadError: _e, ...data } = state;
@@ -405,17 +416,46 @@ export function applyPeriodChanges(changes: PeriodChanges): Promise<boolean> {
   return updateDailyLogs(withPeriodChanges(state.dailyLogs, changes, new Date().toISOString()));
 }
 
+/** How many unreadable months are set aside on the phone (they can hold Daily Tracking answers). */
+export function getDamagedMonthCount(): number {
+  return damagedKeys.size;
+}
+
+/** Every VIVA key on the phone that starts with `prefix`. Throws if the phone can't list its keys. */
+async function listKeys(prefix: string): Promise<string[]> {
+  const all = await AsyncStorage.getAllKeys();
+  return all.filter((k) => isAppKey(k) && k.startsWith(prefix));
+}
+
 /** Remove everything recorded in Daily Tracking EXCEPT period days (the cycle history).
- *  Only the explicit confirmation in Daily Tracking Settings calls this. */
-export function clearTrackingDataKeepPeriods(): Promise<boolean> {
-  if (!canSave) return Promise.resolve(false);
+ *  Unreadable months set aside under `viva-cycle:damaged:` are removed too: they can't be read,
+ *  so their period days were already not part of her history, and they may hold private answers.
+ *  Only the explicit confirmation in Daily Tracking Settings calls this.
+ *  Resolves true only when ALL of it is gone from the phone. */
+export async function clearTrackingDataKeepPeriods(): Promise<boolean> {
+  if (!canSave) return false;
   const now = new Date().toISOString();
   const next: Record<string, DailyLog> = {};
   for (const [date, rec] of Object.entries(state.dailyLogs)) {
     if (rec.period === null) continue;
     next[date] = { ...normalizeRecord(date, { date, period: rec.period }), createdAt: rec.createdAt, updatedAt: now };
   }
-  return updateDailyLogs(next);
+  if (!(await updateDailyLogs(next))) return false;
+  try {
+    // The backup may still be a pre-monthly copy that held Daily Tracking answers: refresh it
+    if (savedCore !== null) await AsyncStorage.setItem(BACKUP_KEY, savedCore);
+    for (const k of await listKeys(DAMAGED_PREFIX)) {
+      await AsyncStorage.removeItem(k);
+      damagedKeys.delete(k);
+    }
+    damagedKeys = new Set(await listKeys(DAMAGED_PREFIX));
+    emit();
+    return damagedKeys.size === 0;
+  } catch {
+    console.warn('VIVA: could not remove set-aside tracking data'); // never log the data itself
+    emit();
+    return false;
+  }
 }
 
 /** Turn one reminder on or off. */
@@ -469,19 +509,110 @@ export function setDateOfBirth(dateOfBirth: DateStr | null) {
   update({ dateOfBirth });
 }
 
-/** For testing: wipe all saved data and return to the Welcome screen. */
-export async function resetVivaStore() {
-  state = { ...EMPTY, loaded: true, loadError: false };
-  canSave = true;
-  savedData = { ...EMPTY };
-  emit();
-  try {
-    await AsyncStorage.removeItem(STORAGE_KEY);
-    for (const m of savedMonths.keys()) await AsyncStorage.removeItem(DAY_PREFIX + m);
-    await AsyncStorage.removeItem(JOURNAL_KEY);
-    savedMonths = new Map();
-    savedCore = null;
-  } catch (e) {
-    console.warn('VIVA: could not clear saved data'); // never log the data itself
+// ---------- Delete all stored data ----------
+
+export type StorageWipeResult =
+  | { ok: true; removed: number }
+  /** nothing: the phone's data is exactly as before. partial: some keys are gone, `remaining` are not. */
+  | { ok: false; deleted: 'nothing' | 'partial'; remaining: string[] };
+
+let wiping: Promise<StorageWipeResult> | null = null;
+
+/** Remove EVERY VIVA Cycle key from the phone (all keys starting with `viva-cycle:`, including
+ *  the backup, damaged copies, journal and tracking settings) and clear what is in memory.
+ *  Other apps' and libraries' keys are never touched.
+ *
+ *  Order matters so nothing deleted can come back on the next launch:
+ *   1. saving is paused and any write already under way is allowed to finish;
+ *   2. the journal goes first: if it can't be removed, NOTHING else is removed (a leftover
+ *      journal would re-write old records at the next launch);
+ *   3. the main profile next (without it the app starts as a new user and never reads the backup);
+ *   4. everything else; then the phone is checked again and any key still there is a failure.
+ *  Success is reported only when the phone holds no VIVA key at all.
+ *  Use lib/dataDeletionService.ts (which also cancels reminders) rather than calling this directly. */
+export function deleteAllStoredData(): Promise<StorageWipeResult> {
+  if (!wiping) {
+    wiping = wipe().finally(() => {
+      wiping = null;
+    });
   }
+  return wiping;
+}
+
+async function wipe(): Promise<StorageWipeResult> {
+  canSave = false;
+  await writeChain.catch(() => {});
+  if (loading) await loading.catch(() => {});
+  const couldSave = !state.loadError; // was saving allowed before this delete?
+  canSave = false; // a load that finished just now may have turned saving back on
+  const failed = (deleted: 'nothing' | 'partial', remaining: string[]) =>
+    restoreAfterFailedWipe({ ok: false, deleted, remaining }, couldSave);
+
+  let keys: string[];
+  try {
+    keys = await listKeys('');
+  } catch {
+    console.warn('VIVA: could not list saved data'); // never log the data itself
+    return failed('nothing', []);
+  }
+
+  if (keys.includes(JOURNAL_KEY)) {
+    try {
+      await AsyncStorage.removeItem(JOURNAL_KEY);
+    } catch {
+      console.warn('VIVA: could not delete saved data');
+      return failed('nothing', keys);
+    }
+  }
+
+  const rank = (k: string) => (k === STORAGE_KEY ? 0 : k === BACKUP_KEY ? 1 : 2);
+  const rest = keys.filter((k) => k !== JOURNAL_KEY).sort((a, b) => rank(a) - rank(b));
+  for (const k of rest) {
+    try {
+      await AsyncStorage.removeItem(k);
+    } catch {
+      // Keep going: remove as much as possible, then report exactly what is left
+    }
+  }
+
+  let remaining: string[];
+  try {
+    remaining = await listKeys('');
+  } catch {
+    // Can't confirm it is all gone, so it is not reported as gone
+    console.warn('VIVA: could not check saved data after deleting');
+    return failed('partial', keys);
+  }
+  if (remaining.length > 0) {
+    console.warn('VIVA: some saved data could not be deleted');
+    return failed('partial', remaining);
+  }
+
+  // All gone: nothing she recorded stays on screen either
+  state = { ...EMPTY, loaded: true, loadError: false };
+  savedData = { ...EMPTY };
+  savedCore = null;
+  savedMonths = new Map();
+  damagedKeys = new Set();
+  loading = Promise.resolve();
+  canSave = true;
+  emit();
+  return { ok: true, removed: keys.length };
+}
+
+/** After a failed delete, show what is REALLY still on the phone (never a fake empty app). */
+async function restoreAfterFailedWipe(
+  result: StorageWipeResult & { ok: false }, couldSave: boolean
+): Promise<StorageWipeResult> {
+  if (result.deleted === 'nothing') {
+    canSave = couldSave; // the data on the phone is unchanged, so the screen already matches it
+    emit();
+    return result;
+  }
+  loading = null;
+  savedCore = null;
+  savedMonths = new Map();
+  damagedKeys = new Set();
+  await loadVivaStore();
+  return result;
 }

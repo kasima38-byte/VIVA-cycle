@@ -81,6 +81,20 @@ export function syncReminders(state: VivaState): Promise<void> {
   return syncing;
 }
 
+/** Cancel EVERY scheduled VIVA reminder and remove any already showing in the notification
+ *  list, then check that nothing is still scheduled. Waits for any reminder sync under way,
+ *  so an older sync can't schedule reminders after this. Throws if any step fails. */
+export function cancelAllReminders(): Promise<void> {
+  const run = syncing.then(async () => {
+    await Notifications.cancelAllScheduledNotificationsAsync();
+    await Notifications.dismissAllNotificationsAsync();
+    const left = await Notifications.getAllScheduledNotificationsAsync();
+    if (left.length > 0) throw new Error(left.length + ' reminder(s) still scheduled');
+  });
+  syncing = run.catch(() => {}); // a failure here must not block later syncs
+  return run;
+}
+
 /** Open the right screen when she taps a reminder. Returns an unsubscribe function. */
 export function listenForReminderTaps(open: (url: string) => void): () => void {
   const sub = Notifications.addNotificationResponseReceivedListener((response) => {

@@ -1,15 +1,30 @@
 // VIVA Cycle - how Daily Tracking records are laid out on the phone
 //
 //   viva-cycle:data           profile, settings, and the list of months that have records
+//   viva-cycle:data-backup    last copy of viva-cycle:data that was read successfully
 //   viva-cycle:daily:YYYY-MM  that month's records, keyed by date
+//   viva-cycle:damaged:YYYY-MM  an unreadable month, set aside untouched
 //   viva-cycle:journal        exists only while a multi-key write is in progress
+//   viva-cycle:daily-tracking-settings  which Daily Tracking cards are shown
+//
+// Every key VIVA Cycle owns starts with APP_KEY_PREFIX. "Delete all my data" relies on that,
+// so any new key MUST use the prefix too.
 //
 // Saving one day rewrites only its month - never the whole history.
 // Every stored record carries schemaVersion so future changes can be migrated safely.
 
+export const APP_KEY_PREFIX = 'viva-cycle:';
+export const DATA_KEY = 'viva-cycle:data';
+export const BACKUP_KEY = 'viva-cycle:data-backup';
 export const DAY_PREFIX = 'viva-cycle:daily:';
 export const JOURNAL_KEY = 'viva-cycle:journal';
 export const DAMAGED_PREFIX = 'viva-cycle:damaged:';
+export const SETTINGS_KEY = 'viva-cycle:daily-tracking-settings';
+
+/** True for keys that belong to VIVA Cycle (never another app's or library's data). */
+export function isAppKey(key: unknown): key is string {
+  return typeof key === 'string' && key.startsWith(APP_KEY_PREFIX);
+}
 
 /** Version of each stored daily record. Bump it and add a step below when the shape changes. */
 export const RECORD_SCHEMA_VERSION = 1;

@@ -8,6 +8,7 @@ const fakeStorage = {
   getItem: async (k) => (memory.has(k) ? memory.get(k) : null),
   setItem: async (k, v) => { if (failing) throw new Error('simulated storage failure'); memory.set(k, v); },
   removeItem: async (k) => { memory.delete(k); },
+  getAllKeys: async () => [...memory.keys()], // like the real AsyncStorage (Clear lists damaged copies)
 };
 const asPath = require.resolve('@react-native-async-storage/async-storage');
 require.cache[asPath] = { id: asPath, filename: asPath, loaded: true, exports: { __esModule: true, default: fakeStorage } };
