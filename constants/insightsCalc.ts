@@ -1,4 +1,5 @@
 import { cycleVariationMargin } from '../lib/cycleEngine';
+import { monthsBefore } from '../lib/periodLength';
 import { CycleRecord } from './insightsData';
 
 export type RangeKey = 'cycle' | '3m' | '6m' | '12m';
@@ -6,11 +7,16 @@ export type RangeKey = 'cycle' | '3m' | '6m' | '12m';
 export const CYCLE_RANGE = { min: 21, max: 35 };
 export const PERIOD_RANGE = { min: 2, max: 7 };
 
-// How many cycles each range looks at.
-// "This Cycle" still shows the last 6 in the charts so bars have context.
-export function selectRecords(all: CycleRecord[], range: RangeKey): CycleRecord[] {
-  const count = range === '3m' ? 3 : range === '6m' ? 6 : range === '12m' ? 12 : 6;
-  return all.slice(-count);
+// "This Cycle" still shows the last 6 completed cycles so bars have context.
+// 3/6/12 Months = cycles that STARTED in that window - the same rule as Period Length
+// (periodsInRange in lib/periodLength.ts), so both cards always describe the same cycles.
+export function selectRecords(all: CycleRecord[], range: RangeKey, today?: string): CycleRecord[] {
+  if (range === 'cycle' || !today) {
+    const count = range === '3m' ? 3 : range === '6m' ? 6 : range === '12m' ? 12 : 6;
+    return all.slice(-count);
+  }
+  const from = monthsBefore(today, range === '3m' ? 3 : range === '6m' ? 6 : 12);
+  return all.filter((r) => r.start >= from && r.start <= today);
 }
 
 export function average(values: number[]): number | null {

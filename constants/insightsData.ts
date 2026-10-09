@@ -4,6 +4,7 @@ import { buildPeriodRecords } from '../lib/periodLength';
 import { getToday } from './dateUtils';
 
 export type CycleRecord = {
+  start: string;                 // date the cycle started (YYYY-MM-DD)
   month: string;                 // month the cycle started
   cycleLength: number;           // observed: start → next start (never from Settings)
   periodLength: number | null;   // recorded bleeding days (null if fewer than 2 recorded)
@@ -24,6 +25,7 @@ export function buildCycleRecords(periods: PeriodLog[], dailyLogs: Record<string
       (d) => diffDays(d.date, c.start) >= 0 && diffDays(c.nextStart, d.date) > 0
     );
     return {
+      start: c.start,
       month: MONTHS[Number(c.start.slice(5, 7)) - 1],
       cycleLength: c.length,
       periodLength: (() => {

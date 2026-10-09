@@ -44,7 +44,7 @@ export default function InsightsScreen() {
   const today = useToday();
   // Observed history only: completed cycles between her logged periods
   const all = useMemo(() => buildCycleRecords(viva.periods, dailyLogs), [viva.periods, dailyLogs]);
-  const records = useMemo(() => selectRecords(all, range), [all, range]);
+  const records = useMemo(() => selectRecords(all, range, today), [all, range, today]);
   const est = useMemo(() => calculateCycle(viva.baseline, viva.periods, today), [viva.baseline, viva.periods, today]);
 
   const cycleAvg = average(records.map((r) => r.cycleLength));

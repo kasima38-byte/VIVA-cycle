@@ -122,6 +122,10 @@ export function periodLengthView(all: PeriodRecord[], range: PeriodRangeKey, tod
   }
   if (counted.length === 1) notes.push('Based on 1 logged period. Log more periods to see your pattern.');
   else if (counted.length > 1) notes.push('Based on your last ' + counted.length + ' periods');
+  // Bars: completed, logged periods only (never active or predicted days).
+  // This Cycle: the current period may still be in progress, so - like the Cycle Length
+  // card - the bars show her recent completed periods for context. Average is unchanged.
+  const chartPeriods = range === 'cycle' ? all.filter((p) => p.countsForAverage).slice(-6) : counted;
   return {
     inRange,
     counted,
@@ -132,7 +136,7 @@ export function periodLengthView(all: PeriodRecord[], range: PeriodRangeKey, tod
     statusText: status ? status.text : active ? 'Tracking in progress' : 'No completed period data yet',
     subtitle: inRange.length > 0 ? 'Your logged bleeding days' : 'Tap bleeding days on the Calendar to track your period length.',
     notes,
-    chart: counted.map((p, i) => ({ label: monthOf(p.start), value: p.recordedDays, current: i === counted.length - 1 })),
+    chart: chartPeriods.map((p, i) => ({ label: monthOf(p.start), value: p.recordedDays, current: i === chartPeriods.length - 1 })),
   };
 }
 
