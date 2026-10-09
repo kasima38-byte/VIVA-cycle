@@ -24,11 +24,6 @@ export function average(values: number[]): number | null {
   return values.reduce((a, b) => a + b, 0) / values.length;
 }
 
-export function formatAverage(value: number | null): string {
-  if (value === null) return '-';
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
-}
-
 export function isWithin(value: number | null, range: { min: number; max: number }): boolean {
   return value !== null && value >= range.min && value <= range.max;
 }

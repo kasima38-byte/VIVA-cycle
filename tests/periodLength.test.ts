@@ -3,7 +3,7 @@
 // Run: npx -y tsx tests/periodLength.test.ts
 import { buildPeriodRecords, periodLengthView, PeriodRangeKey, periodDetailRows, formatDays } from '../lib/periodLength';
 import { bleedingMarks, derivePeriodLogs } from '../lib/periodTracking';
-import { calculateCycle, predictCycles } from '../lib/cycleEngine';
+import { addDays, calculateCycle, diffDays, predictCycles } from '../lib/cycleEngine';
 
 type Logs = Record<string, { period: 'yes' | 'no' }>;
 const d = (md: string) => '2030-' + md;
@@ -193,7 +193,7 @@ check('T2. One confirmed day: in progress, estimate shown, average unchanged', (
   const v = cycleView(s);
   eq(bars(v), ['Jul 4', 'Aug 4', 'Sep 3'], 'bars'); eq(v.averageText, '3.7 days', 'average');
   eq(periodDetailRows(v)[0].value, '1 day so far', 'details');
-  if (!v.notes.some((n) => n.startsWith('Estimated period length: 4 days'))) throw new Error('no estimate note: ' + JSON.stringify(v.notes));
+  if (!v.notes.some((n) => n.startsWith('This period is estimated at 4 days'))) throw new Error('no estimate note: ' + JSON.stringify(v.notes));
   calPredicted(s, d('10-03'), false); calPredicted(s, d('10-05'), true);
 });
 
@@ -311,6 +311,47 @@ check('W1. formatDays: whole numbers without .0, otherwise one decimal', () => {
 
 check('W2. formatDays for Cycle Length / Profile values (no trailing .0)', () => {
   eq([28, 31, 31.0, 31.5, 30.96].map(formatDays), ['28 days', '31 days', '31 days', '31.5 days', '31 days'], 'formatted');
+});
+
+// ---------- Estimate note (X1-X3) ----------
+check('X1. In-progress period -> note says "This period is estimated at"', () => {
+  const notes = cycleView(state([...HIST, '10-03', '10-04'], d('10-04'))).notes;
+  if (!notes.includes('This period is estimated at 4 days (prediction, not recorded bleeding)')) throw new Error(JSON.stringify(notes));
+});
+
+check('X2. Completed period -> note refers to the NEXT period', () => {
+  const notes = cycleView(state([...HIST, ...days('10', 3, 6)], d('10-09'))).notes;
+  if (!notes.some((n) => n.startsWith('Next period is estimated at 4 days'))) throw new Error(JSON.stringify(notes));
+  if (notes.some((n) => n.startsWith('This period'))) throw new Error('still says This period');
+});
+
+check('X3. Note only on This Cycle and changes no bars or Average', () => {
+  const s = state([...HIST, '10-03', '10-04'], d('10-04'));
+  (['3m', '6m', '12m'] as PeriodRangeKey[]).forEach((rg) => {
+    if (periodLengthView(s.records, rg, s.today, 4).notes.some((n) => n.includes('estimated'))) throw new Error(rg + ' shows estimate');
+  });
+  const a = periodLengthView(s.records, 'cycle', s.today, 4), b = periodLengthView(s.records, 'cycle', s.today, null);
+  eq([a.chart, a.average], [b.chart, b.average], 'estimate changes nothing else');
+});
+
+// ---------- November prediction (Y1-Y2) ----------
+check('Y1. Your 2026 dates -> engine predicts Nov 3-6, 2026 (Calendar agrees)', () => {
+  const l: any = {};
+  ['2026-07-01', '2026-07-02', '2026-07-03', '2026-07-04', '2026-08-01', '2026-08-02', '2026-08-03', '2026-08-04',
+   '2026-09-01', '2026-09-02', '2026-09-03', '2026-10-03', '2026-10-04', '2026-10-05', '2026-10-06'].forEach((k) => (l[k] = { period: 'yes' }));
+  const today = '2026-10-09';
+  const est = calculateCycle({ cycleLength: null, periodLength: 3, regularity: 'not_sure' } as any, derivePeriodLogs(l), today)!;
+  eq([est.cycleLengthUsed, est.periodLengthUsed], [31, 4], 'cycle / period length used');
+  const next = predictCycles(est, 1)[0];
+  eq([next.periodStart, next.periodEnd], ['2026-11-03', '2026-11-06'], 'next period');
+  const s: any = { l, today, records: buildPeriodRecords(l, today, 3), est };
+  calPredicted(s, '2026-11-02', false); calPredicted(s, '2026-11-03', true);
+  calPredicted(s, '2026-11-06', true); calPredicted(s, '2026-11-07', false);
+});
+
+check('Y2. Date maths is calendar-safe (year end, DST weekends)', () => {
+  eq([addDays('2026-12-30', 3), addDays('2026-03-28', 2), addDays('2026-10-24', 2), diffDays('2027-01-02', '2026-12-30')],
+    ['2027-01-02', '2026-03-30', '2026-10-26', 3], 'dates');
 });
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

@@ -137,7 +137,10 @@ export function periodLengthView(all: PeriodRecord[], range: PeriodRangeKey, tod
   if (chartPeriods.length === 1) notes.push('Based on 1 logged period. Log more periods to see your pattern.');
   else if (chartPeriods.length > 1) notes.push('Based on your last ' + chartPeriods.length + ' periods');
   // Engine prediction (history -> Settings -> default): an ESTIMATE only, never a bar or in the average
-  if (range === 'cycle' && estimatedLength) notes.push('Estimated period length: ' + daysText(estimatedLength) + ' (prediction - not included in the average)');
+  if (range === 'cycle' && estimatedLength) {
+    const which = active ? 'This period' : 'Next period'; // in progress -> this one; completed -> the next one
+    notes.push(which + ' is estimated at ' + formatDays(estimatedLength) + ' (prediction, not recorded bleeding)');
+  }
   // Short month labels; if a month name repeats (e.g. Oct 2025 + Oct 2026), every label gets a 2-digit year
   const shortLabels = chartPeriods.map((p) => monthOf(p.start));
   const chartLabels = new Set(shortLabels).size < shortLabels.length
