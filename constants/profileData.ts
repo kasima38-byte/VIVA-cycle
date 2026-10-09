@@ -1,5 +1,6 @@
 import { PeriodLog } from '../lib/cycleEngine';
-import { average, formatAverage } from './insightsCalc';
+import { average } from './insightsCalc';
+import { formatDays } from '../lib/periodLength';
 import { buildCycleRecords } from './insightsData';
 
 export const userProfile = {
@@ -12,8 +13,8 @@ export function getProfileStats(periods: PeriodLog[]) {
   const periodLengths = recent.flatMap((r) => (r.periodLength === null ? [] : [r.periodLength]));
   return {
     cyclesTracked: recent.length,
-    averageCycle: recent.length ? formatAverage(average(recent.map((r) => r.cycleLength))) + ' days' : '–',
-    averagePeriod: periodLengths.length ? formatAverage(average(periodLengths)) + ' days' : '–',
+    averageCycle: recent.length ? formatDays(average(recent.map((r) => r.cycleLength))!) : '–',
+    averagePeriod: periodLengths.length ? formatDays(average(periodLengths)!) : '–',
   };
 }
 

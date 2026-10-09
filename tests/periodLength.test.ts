@@ -309,5 +309,9 @@ check('W1. formatDays: whole numbers without .0, otherwise one decimal', () => {
     ['3 days', '3 days', '3.5 days', '3.7 days', '4 days', '3 days', '1 day'], 'formatted');
 });
 
+check('W2. formatDays for Cycle Length / Profile values (no trailing .0)', () => {
+  eq([28, 31, 31.0, 31.5, 30.96].map(formatDays), ['28 days', '31 days', '31 days', '31.5 days', '31 days'], 'formatted');
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

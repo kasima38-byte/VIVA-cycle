@@ -4,7 +4,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import BottomSheet from '../../components/BottomSheet';
 import ChartCard from '../../components/ChartCard';
-import { buildPeriodRecords, periodDetailRows, periodLengthView } from '../../lib/periodLength';
+import { buildPeriodRecords, formatDays, periodDetailRows, periodLengthView } from '../../lib/periodLength';
 import InsightSummaryCard from '../../components/InsightSummaryCard';
 import SegmentedTabs from '../../components/SegmentedTabs';
 import TipCard from '../../components/TipCard';
@@ -21,7 +21,6 @@ import {
   calculateCycleRegularity,
   calculateMoodPattern,
   calculateTypicalFertileWindow,
-  formatAverage,
   generatePersonalInsight,
   isWithin,
   selectRecords,
@@ -74,7 +73,7 @@ export default function InsightsScreen() {
       
   // Before any cycle is completed, show what predictions use — clearly labelled
   const usingText = !est ? '-' : est.lengthSource === 'default' ? 'Not known yet' : est.cycleLengthUsed + ' days';
-  const cycleAvgText = cycleAvg === null ? usingText : formatAverage(cycleAvg) + ' days';
+  const cycleAvgText = cycleAvg === null ? usingText : formatDays(cycleAvg);
 
   return (
     <View style={styles.root}>
@@ -108,7 +107,7 @@ export default function InsightsScreen() {
             title="Cycle Length"
             subtitle={records.length ? 'Your last ' + records.length + (records.length === 1 ? ' cycle' : ' cycles') : 'Log your next period to complete a cycle'}
             data={cycleData}
-            averageText={cycleAvg === null ? '–' : formatAverage(cycleAvg) + ' days'}
+            averageText={cycleAvg === null ? '–' : formatDays(cycleAvg)}
             withinRange={cycleAvg === null ? null : isWithin(cycleAvg, CYCLE_RANGE)}
             rangeText="(21 - 35 days)"
             chartLabel="Cycle length chart"
