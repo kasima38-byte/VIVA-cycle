@@ -1,5 +1,7 @@
 // VIVA Cycle - the lock screen. Shown INSTEAD of the app (see app/_layout.tsx), so no VIVA screen
 // is rendered behind it. Shows nothing about her records: only the PIN pad and generic messages.
+// If she turned on Face ID / fingerprint, the phone's own prompt is offered once when this screen
+// appears (and by a button). Cancelling or failing it just leaves the PIN pad, which always works.
 
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
@@ -7,8 +9,11 @@ import { AccessibilityInfo, ActivityIndicator, Alert, Pressable, ScrollView, Sty
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing } from '../constants/theme';
 import { PIN_LENGTH, getWaitMs } from '../lib/appLock';
-import { forgetAppLock, initAppLock, unlockWithPin, useAppLock } from '../lib/appLockSession';
-import { FORGOT_PIN_FINAL, FORGOT_PIN_FIRST, LOCK_SCREEN, verifyMessage, waitText, APP_LOCK } from '../lib/appLockText';
+import { forgetAppLock, initAppLock, unlockWithBiometrics, unlockWithPin, useAppLock } from '../lib/appLockSession';
+import {
+  APP_LOCK, BIOMETRIC, FORGOT_PIN_FINAL, FORGOT_PIN_FIRST, LOCK_SCREEN, biometricLockMessage, biometricName, verifyMessage, waitText,
+} from '../lib/appLockText';
+import { biometricForLockScreen, type BiometricMethod } from '../lib/biometricUnlock';
 import { deleteAllUserData } from '../lib/dataDeletionService';
 import { deleteAllResultMessage } from '../lib/dataDeletion';
 import PinPad from './PinPad';
@@ -22,6 +27,9 @@ function ask(d: { title: string; body: string; cancel: string; confirm: string }
   );
 }
 
+// The automatic Face ID / fingerprint prompt is offered once per launch (never twice at once)
+let autoOffered = false;
+
 export default function AppLockScreen() {
   const { gate } = useAppLock();
   const [pin, setPin] = useState('');
@@ -29,6 +37,42 @@ export default function AppLockScreen() {
   const [checking, setChecking] = useState(false);
   const [waitMs, setWaitMs] = useState(0);
   const busy = useRef(false);
+  const [bio, setBio] = useState<BiometricMethod | null>(null);
+
+  const tryBiometric = async () => {
+    if (busy.current) return;
+    busy.current = true;
+    try {
+      const r = await unlockWithBiometrics(BIOMETRIC.prompt);
+      if (r === 'unavailable' || r === 'error' || r === 'notOffered') setBio(null); // PIN only now
+      const name = bio ? biometricName(bio) : 'Face ID or fingerprint';
+      const msg = biometricLockMessage(r, name);
+      setMessage(msg);
+      if (msg) AccessibilityInfo.announceForAccessibility(msg);
+    } finally {
+      busy.current = false;
+    }
+  };
+
+  // Offer Face ID / fingerprint once, only if she turned it on and the phone can do it now
+  useEffect(() => {
+    if (gate !== 'locked') return;
+    let alive = true;
+    biometricForLockScreen().then((m) => {
+      if (!alive || !m) return;
+      setBio(m);
+      if (autoOffered) return;
+      autoOffered = true;
+      void unlockWithBiometrics(BIOMETRIC.prompt).then((r) => {
+        if (!alive) return;
+        if (r === 'unavailable' || r === 'error' || r === 'notOffered') setBio(null);
+        setMessage(biometricLockMessage(r, biometricName(m)));
+      });
+    });
+    return () => {
+      alive = false;
+    };
+  }, [gate]);
 
   // Waits survive restarts: read the remaining wait when the screen appears, then count down
   useEffect(() => {
@@ -119,6 +163,18 @@ export default function AppLockScreen() {
           {!checking && message ? <Text style={styles.error}>{message}</Text> : null}
           {!checking && waiting ? <Text style={styles.wait}>Try again in {waitText(waitMs)}.</Text> : null}
         </View>
+        {bio ? (
+          <Pressable
+            onPress={() => void tryBiometric()}
+            disabled={checking}
+            style={styles.bioButton}
+            accessibilityRole="button"
+            accessibilityLabel={BIOMETRIC.lockScreenButton(biometricName(bio))}
+          >
+            <Ionicons name={bio === 'faceId' || bio === 'face' ? 'scan' : 'finger-print'} size={22} color={colors.magenta} />
+            <Text style={styles.bioText}>{BIOMETRIC.lockScreenButton(biometricName(bio))}</Text>
+          </Pressable>
+        ) : null}
         <Pressable onPress={() => void forgot()} disabled={checking} hitSlop={10} accessibilityRole="button" style={styles.link}>
           <Text style={styles.linkText}>{LOCK_SCREEN.forgot}</Text>
         </Pressable>
@@ -137,6 +193,11 @@ const styles = StyleSheet.create({
   messageArea: { minHeight: 44, alignItems: 'center', justifyContent: 'center', gap: 4 },
   error: { fontSize: 15, fontWeight: '600', color: colors.magentaText, textAlign: 'center' },
   wait: { fontSize: 14, color: colors.textSecondary, textAlign: 'center' },
+  bioButton: {
+    minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: 20,
+    borderRadius: 24, borderWidth: 1.5, borderColor: colors.magenta,
+  },
+  bioText: { fontSize: 16, fontWeight: '700', color: colors.magentaText },
   link: { minHeight: 44, justifyContent: 'center' },
   linkText: { fontSize: 15, fontWeight: '600', color: colors.navySoft },
   retry: { marginTop: spacing.md, backgroundColor: colors.magenta, borderRadius: 28, paddingVertical: 14, paddingHorizontal: 32 },

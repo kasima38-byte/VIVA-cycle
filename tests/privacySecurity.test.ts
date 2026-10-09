@@ -121,9 +121,15 @@ function eq(a: unknown, b: unknown, what: string) {
     const { content } = await boot();
     const all = JSON.stringify(content) + read('app/privacy-security.tsx');
     for (const bad of [/\bis encrypted\b/i, /\bfully encrypted\b/i, /never leaves?/i, /100% (private|secure)/i,
-      /delete (your )?account/i, /\blog ?out\b/i, /\bsign ?in\b/i, /biometric|face id|fingerprint/i,
+      /delete (your )?account/i, /\blog ?out\b/i, /\bsign ?in\b/i,
       /cloud backup (is|has been) (off|disabled)/i]) {
       ok(!bad.test(all), 'forbidden claim: ' + bad);
+    }
+    // Face ID / fingerprint may be mentioned only because it really exists (and only with App Lock)
+    if (/biometric|face id|fingerprint/i.test(all)) {
+      ok(fs.existsSync(path.join(ROOT, 'lib/biometricUnlock.ts')), 'biometric unlock is implemented');
+      ok(JSON.parse(read('package.json')).dependencies['expo-local-authentication'], 'system biometric library installed');
+      ok(/lockOn === true && <BiometricUnlockSettings \/>/.test(read('app/privacy-security.tsx')), 'shown only with App Lock on');
     }
   });
 
@@ -160,6 +166,13 @@ function eq(a: unknown, b: unknown, what: string) {
     ok(/onPress=\{\(\) => void requestDeleteAll\(\)\}/.test(screen), 'only from onPress');
     const hook = read('lib/useDeleteAllData.ts');
     ok(!/useEffect/.test(hook), 'hook must not run on mount');
+    // The Face ID / fingerprint rows only READ on open; turning off happens only from a press
+    const bio = read('components/BiometricUnlockSettings.tsx');
+    const effect = bio.slice(bio.indexOf('const refresh = useCallback'), bio.indexOf('useFocusEffect(refresh);'));
+    ok(/getBiometricStatus\(\), isBiometricUnlockOn\(\)/.test(effect), 'reads status and choice');
+    ok(!/disable|delete|remove|set[A-Z]\w*Item|enable/i.test(effect.replace(/setStatus|setOn/g, '')), 'changes nothing on open');
+    ok(!/deleteAllUserData|deleteAllStoredData|clearTrackingData|removeItem/.test(bio), 'never deletes data');
+    ok(/onPress=\{\(\) => void turnOff\(\)\}/.test(bio), 'turn off only from a press');
   });
 
   await check('S3b. Visiting the screen leaves stored data intact', async () => {

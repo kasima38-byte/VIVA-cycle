@@ -9,6 +9,7 @@
 
 import { useSyncExternalStore } from 'react';
 import { getLockStatus, refreshVerifierIfOld, removeAppLock, verifyPin, type VerifyResult } from './appLock';
+import { getBiometricStatus, isBiometricUnlockOn, promptBiometric, type BiometricResult } from './biometricUnlock';
 
 export type Gate = 'checking' | 'locked' | 'unknown' | 'open';
 type State = { gate: Gate; lockOn: boolean | null };
@@ -58,6 +59,21 @@ export async function unlockWithPin(pin: string): Promise<VerifyResult> {
     flushPendingLinks();
     // A PIN saved with an older round count is re-saved now, in the background (app already open)
     void refreshVerifierIfOld(pin);
+  }
+  return result;
+}
+
+/** Lock screen: Face ID / fingerprint, only if she turned it on and the phone can do it now.
+ *  Only a 'success' from the phone's own prompt opens the app; anything else leaves it locked
+ *  and the PIN pad stays available. The wrong-PIN counter is not touched. */
+export async function unlockWithBiometrics(promptMessage: string): Promise<BiometricResult | 'notOffered'> {
+  if (state.gate !== 'locked') return 'notOffered';
+  if (!(await isBiometricUnlockOn())) return 'notOffered';
+  if ((await getBiometricStatus()).kind !== 'available') return 'unavailable';
+  const result = await promptBiometric(promptMessage);
+  if (result === 'success' && state.gate === 'locked') {
+    set({ gate: 'open' });
+    flushPendingLinks();
   }
   return result;
 }

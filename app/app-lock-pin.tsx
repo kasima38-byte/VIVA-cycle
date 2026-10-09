@@ -2,6 +2,7 @@
 // mode=setup   : new PIN, then the same again
 // mode=change  : current PIN, new PIN, new PIN again (current checked before anything changes)
 // mode=disable : current PIN (a wrong PIN never turns the lock off)
+// mode=biometric: current PIN, then the phone's own Face ID / fingerprint prompt, then it is on
 // PINs live only in this screen's memory while typing and are cleared after every step.
 
 import { Ionicons } from '@expo/vector-icons';
@@ -13,14 +14,16 @@ import PinPad from '../components/PinPad';
 import { colors, spacing } from '../constants/theme';
 import { PIN_LENGTH, changePin, disableLock, setupPin, verifyPin } from '../lib/appLock';
 import { noteLockChanged } from '../lib/appLockSession';
-import { PIN_FLOW, verifyMessage } from '../lib/appLockText';
+import { BIOMETRIC, PIN_FLOW, biometricName, enableBiometricMessage, isBiometricMethod, verifyMessage } from '../lib/appLockText';
+import { enableBiometricUnlock } from '../lib/biometricUnlock';
 
-type Mode = 'setup' | 'change' | 'disable';
+type Mode = 'setup' | 'change' | 'disable' | 'biometric';
 
 export default function AppLockPinScreen() {
-  const params = useLocalSearchParams<{ mode?: string }>();
-  const mode: Mode = params.mode === 'change' || params.mode === 'disable' ? params.mode : 'setup';
-  const flow = PIN_FLOW[mode];
+  const params = useLocalSearchParams<{ mode?: string; method?: string }>();
+  const mode: Mode = params.mode === 'change' || params.mode === 'disable' || params.mode === 'biometric' ? params.mode : 'setup';
+  const bioName = biometricName(isBiometricMethod(params.method) ? params.method : 'biometrics');
+  const flow = mode === 'biometric' ? { ...PIN_FLOW.biometric, title: BIOMETRIC.turnOn(bioName) } : PIN_FLOW[mode];
 
   const [step, setStep] = useState(0);
   const [pin, setPin] = useState('');
@@ -61,6 +64,13 @@ export default function AppLockPinScreen() {
         else if (r === 'mismatch') restart(PIN_FLOW.mismatch);
         else if (r === 'alreadyOn') finish(PIN_FLOW.doneSetup, true);
         else restart(PIN_FLOW.saveError);
+        return;
+      }
+      if (mode === 'biometric') {
+        // PIN first (counted like any PIN), then the phone's own prompt; only both turn it on
+        const r = await enableBiometricUnlock(entered, BIOMETRIC.enablePrompt);
+        if (r.ok) finish(enableBiometricMessage(r, bioName), true);
+        else say(enableBiometricMessage(r, bioName)); // nothing was changed
         return;
       }
       if (mode === 'disable') {

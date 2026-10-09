@@ -32,6 +32,12 @@
         {
           "configureAndroidBackup": false
         }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "VIVA Cycle uses Face ID only to unlock the app when you turn this on."
+        }
       ]
     ]
   }

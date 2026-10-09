@@ -4,6 +4,9 @@
 //   viva-cycle.app-lock          {v, kdf, iterations, salt, hash}  - a PIN VERIFIER, never the PIN
 //                                (PBKDF2 with PIN_ITERATIONS rounds and a new random salt each save)
 //   viva-cycle.app-lock-attempts {failures, lastFailureAt}        - wrong-PIN counter
+//   viva-cycle.biometric-unlock  'on'                             - her choice to also allow
+//                                Face ID / fingerprint (lib/biometricUnlock.ts). Cleared whenever
+//                                App Lock is set up, turned off or reset, so it is never inherited.
 // The verifier is PBKDF2-HMAC-SHA256 (@noble/hashes, audited, pure JS) with a random 16-byte salt.
 //
 // Limits (honest): a 6-digit PIN has only 1,000,000 possibilities. Salting and PBKDF2 stop
@@ -26,6 +29,7 @@ export const PIN_LENGTH = 6;
 export const PIN_ITERATIONS = 10_000;
 const LOCK_KEY = 'viva-cycle.app-lock';
 const ATTEMPTS_KEY = 'viva-cycle.app-lock-attempts';
+export const BIOMETRIC_PREF_KEY = 'viva-cycle.biometric-unlock';
 const OPTIONS: SecureStore.SecureStoreOptions = { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY };
 
 /** Wrong PINs allowed before waits start, then the wait after each further wrong PIN. */
@@ -192,6 +196,8 @@ export async function setupPin(pin: string, confirm: string): Promise<SetupResul
   if (pin !== confirm) return 'mismatch';
   try {
     if (await readVerifier()) return 'alreadyOn';
+    // A new lock starts with biometrics OFF: she must choose them again herself
+    await SecureStore.deleteItemAsync(BIOMETRIC_PREF_KEY, OPTIONS);
     await writeAttempts({ failures: 0, lastFailureAt: 0 });
     await writeVerifier(pin);
     return 'saved';
@@ -223,6 +229,7 @@ export async function disableLock(current: string, now = Date.now()): Promise<Ve
   const check = await verifyPin(current, now);
   if (!check.ok) return check;
   try {
+    await SecureStore.deleteItemAsync(BIOMETRIC_PREF_KEY, OPTIONS);
     await SecureStore.deleteItemAsync(LOCK_KEY, OPTIONS);
     await SecureStore.deleteItemAsync(ATTEMPTS_KEY, OPTIONS);
     if (await readVerifier()) throw new Error('still on');
@@ -236,6 +243,7 @@ export async function disableLock(current: string, now = Date.now()): Promise<Ve
 /** Delete All My Data / "Forgot PIN" reset: remove the lock settings along with everything else.
  *  Only ever called after her explicit, double-confirmed choice to erase all VIVA data. */
 export async function removeAppLock(): Promise<void> {
+  await SecureStore.deleteItemAsync(BIOMETRIC_PREF_KEY, OPTIONS);
   await SecureStore.deleteItemAsync(LOCK_KEY, OPTIONS);
   await SecureStore.deleteItemAsync(ATTEMPTS_KEY, OPTIONS);
 }

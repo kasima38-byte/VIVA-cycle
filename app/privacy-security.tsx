@@ -19,6 +19,7 @@ import {
 import { useDeleteAllData } from '../lib/useDeleteAllData';
 import { useAppLock } from '../lib/appLockSession';
 import { APP_LOCK } from '../lib/appLockText';
+import BiometricUnlockSettings from '../components/BiometricUnlockSettings';
 import { getVivaState, setDiscreetNotifications, useVivaStore } from '../lib/vivaStore';
 
 function InfoCard({ items }: { items: InfoItem[] }) {
@@ -146,6 +147,7 @@ function AppLockSection() {
           <SettingsRow icon="lock-open" title={APP_LOCK.turnOff} subtitle={APP_LOCK.turnOffBody} onPress={() => open('disable')} />
         </>
       )}
+      {lockOn === true && <BiometricUnlockSettings />}
       <Text style={styles.note} accessibilityLiveRegion="polite">
         {lockOn === true ? APP_LOCK.statusOn : lockOn === false ? APP_LOCK.statusOff : APP_LOCK.statusUnknown}
       </Text>

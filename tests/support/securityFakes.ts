@@ -76,7 +76,36 @@ const getRandomBytes = (n: number) => new Uint8Array(nodeCrypto.randomBytes(n));
 const expoCrypto = { AESEncryptionKey, AESSealedData, aesEncryptAsync, aesDecryptAsync, getRandomBytesAsync, getRandomBytes,
   AESKeySize: { AES128: 128, AES192: 192, AES256: 256 } };
 
-for (const [name, exports] of [['expo-secure-store', secureStore], ['expo-crypto', expoCrypto]] as const) {
+// ---------- Biometrics (expo-local-authentication) and expo-constants ----------
+// A pretend phone: what it supports, and what its next system prompt will answer.
+export const bio = {
+  hardware: true,
+  types: [2] as number[], // 1 fingerprint, 2 face, 3 iris
+  level: 3, // 0 none, 1 passcode only, 2 weak, 3 strong
+  answers: [] as any[], // results of the next prompts; empty = { success: true }
+  prompts: [] as any[], // options each prompt was shown with
+  throwAll: false,
+  executionEnvironment: 'standalone',
+};
+const localAuth = {
+  AuthenticationType: { FINGERPRINT: 1, FACIAL_RECOGNITION: 2, IRIS: 3 },
+  SecurityLevel: { NONE: 0, SECRET: 1, BIOMETRIC_WEAK: 2, BIOMETRIC_STRONG: 3 },
+  hasHardwareAsync: async () => { if (bio.throwAll) throw new Error('x'); return bio.hardware; },
+  supportedAuthenticationTypesAsync: async () => { if (bio.throwAll) throw new Error('x'); return [...bio.types]; },
+  isEnrolledAsync: async () => bio.level >= 2,
+  getEnrolledLevelAsync: async () => { if (bio.throwAll) throw new Error('x'); return bio.level; },
+  authenticateAsync: async (o: any) => {
+    if (bio.throwAll) throw new Error('x');
+    bio.prompts.push(o);
+    return bio.answers.length ? bio.answers.shift() : { success: true };
+  },
+};
+const constants = { get executionEnvironment() { return bio.executionEnvironment; } };
+const constantsModule = { ExecutionEnvironment: { Bare: 'bare', Standalone: 'standalone', StoreClient: 'storeClient' },
+  default: constants };
+
+for (const [name, exports] of [['expo-secure-store', secureStore], ['expo-crypto', expoCrypto],
+  ['expo-local-authentication', localAuth]] as const) {
   const p = req.resolve(name);
   req.cache[p] = { id: p, filename: p, loaded: true, exports: { __esModule: true, ...exports, default: exports } };
 }
@@ -108,7 +137,13 @@ export function seal(text: string, storageKey: string): string {
   const ct = Buffer.concat([c.update(Buffer.from(text, 'utf8')), c.final()]);
   return 'vc1:' + Buffer.concat([iv, ct, c.getAuthTag()]).toString('base64');
 }
+{
+  const p = req.resolve('expo-constants');
+  req.cache[p] = { id: p, filename: p, loaded: true, exports: { __esModule: true, ...constantsModule } };
+}
+
 export function resetSecurity() {
+  Object.assign(bio, { hardware: true, types: [2], level: 3, answers: [], prompts: [], throwAll: false, executionEnvironment: 'standalone' });
   keychain.clear();
   Object.assign(secureFaults, { get: false, set: false, del: false, dropWrites: false });
 }
