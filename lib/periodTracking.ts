@@ -73,7 +73,21 @@ export function cycleStartEpisodes(episodes: PeriodEpisode[]): PeriodEpisode[] {
 
 /** The period-start list the cycle engine reads. No end dates: bleeding facts come from the days themselves. */
 export function derivePeriodLogs(logs: Logs): PeriodLog[] {
-  return cycleStartEpisodes(episodesFromLogs(logs)).map((ep) => ({ start: ep.start }));
+  // A period followed by a newer one is finished, so it gets its end: the engine can then use
+  // her CONFIRMED period lengths for predictions (otherwise it only ever saw starts and fell back
+  // to Settings). Same rules as Insights: no end if a day is missing or only 1 day was logged.
+  // The latest period may still be ongoing, so it never gets an end here.
+  const starts = cycleStartEpisodes(episodesFromLogs(logs));
+  const bleeding = bleedingDates(logs);
+  return starts.map((ep, i) => {
+    const next = starts[i + 1];
+    if (!next) return { start: ep.start };
+    const windowEnd = addDays(ep.start, 9); // same 10-day window as lib/periodLength.ts
+    const limit = next.start <= windowEnd ? addDays(next.start, -1) : windowEnd;
+    const logged = bleeding.filter((d) => d >= ep.start && d <= limit).length;
+    if (logged > ep.recordedDays || ep.recordedDays < MIN_RECORDED_FOR_STATS) return { start: ep.start };
+    return { start: ep.start, end: ep.end };
+  });
 }
 
 export type PeriodDayInfo = {

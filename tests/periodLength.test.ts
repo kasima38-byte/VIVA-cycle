@@ -2,6 +2,8 @@
 // Uses made-up 2030 dates only - never real user data.
 // Run: npx -y tsx tests/periodLength.test.ts
 import { buildPeriodRecords, periodLengthView, PeriodRangeKey, prefillPeriodDays } from '../lib/periodLength';
+import { derivePeriodLogs } from '../lib/periodTracking';
+import { calculateCycle } from '../lib/cycleEngine';
 
 type Logs = Record<string, { period: 'yes' | 'no' }>;
 const d = (md: string) => '2030-' + md;
@@ -153,6 +155,21 @@ check('H4. Pre-fill: stops before the next logged period', () => {
 
 check('H5. Pre-fill: stops at a day she marked "no period"', () => {
   eq(prefillPeriodDays(d('10-03'), 5, d('10-09'), null, logs([], ['10-05']) as any), [d('10-03'), d('10-04')], 'days');
+});
+
+check('I1. Finished periods carry their end; the latest (maybe ongoing) does not', () => {
+  eq(derivePeriodLogs(S443 as any).map((p: any) => p.start.slice(5) + '>' + (p.end ? p.end.slice(5) : '-')),
+    ['07-01>07-04', '08-01>08-04', '09-01>09-03', '10-03>-'], 'periods');
+});
+
+check('I2. A period with a missing day gets no end (not used for predictions)', () => {
+  const l = logs(['07-01', '07-02', '07-04', ...days('08', 1, 4)]);
+  eq(derivePeriodLogs(l as any).map((p: any) => !!p.end), [false, false], 'has end');
+});
+
+check('I3. Prediction uses confirmed history (4,4,3 -> 4 days), not Settings (3)', () => {
+  const est = calculateCycle({ cycleLength: null, periodLength: 3, regularity: 'not_sure' } as any, derivePeriodLogs(S443 as any), T);
+  eq(est?.periodLengthUsed, 4, 'periodLengthUsed');
 });
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
