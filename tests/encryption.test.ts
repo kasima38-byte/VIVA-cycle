@@ -1,7 +1,7 @@
 // Encryption at rest: REAL store + encryption layer + migration, real AES-256-GCM (Node crypto),
 // in-memory AsyncStorage and Keychain with switchable failures. Never touches the phone.
 // Run: npx -y tsx tests/encryption.test.ts
-import { keychain, resetSecurity, secureFaults } from './support/securityFakes';
+import { keychain, plain, resetSecurity, secureFaults } from './support/securityFakes';
 const req: any = require; // Node's require
 const Buffer: any = req('buffer').Buffer;
 const fs = req('fs');
@@ -295,6 +295,107 @@ function eq(a: unknown, b: unknown, what: string) {
     for (const f of ['lib/vivaStore.ts', 'lib/dailyTrackingSettingsService.ts']) {
       ok(/import AsyncStorage from '\.\/secureStorage';/.test(read(f)) && !/@react-native-async-storage/.test(read(f)), f + ' goes through the encryption layer');
     }
+  });
+
+  // ---------- Added by the encryption-at-rest audit (Prompt 4) ----------
+  await check('E14. Any change to the nonce, ciphertext or authentication tag is refused (and a cut-off value)', async () => {
+    await reset();
+    const app = await boot();
+    app.store.completeSetup({ name: 'Amina', dateOfBirth: null, lastPeriodStart: '2025-07-01',
+      baseline: { cycleLength: 28, periodLength: 5, regularity: 'regular' }, goal: null });
+    await settle();
+    const key = await (await import('../lib/dataKey')).readDataKey();
+    const name = 'viva-cycle:daily:2025-07';
+    const sealed = await app.cipher.encryptValue(key, name, '{"2025-07-02":{"symptoms":["cramps"]}}');
+    const bytes = Buffer.from(sealed.slice(4), 'base64');
+    const variant = (i: number) => { const b = Buffer.from(bytes); b[i] ^= 1; return 'vc1:' + b.toString('base64'); };
+    const spots = { nonce: 0, 'nonce end': 11, ciphertext: 12, 'ciphertext end': bytes.length - 17, tag: bytes.length - 16, 'tag end': bytes.length - 1 };
+    for (const [where, i] of Object.entries(spots)) {
+      let threw = false;
+      try { await app.cipher.decryptValue(key, name, variant(i)); } catch { threw = true; }
+      ok(threw, 'changed ' + where + ' was accepted');
+    }
+    for (const cut of ['vc1:' + bytes.subarray(0, bytes.length - 1).toString('base64'), 'vc1:', 'vc1:AAAA']) {
+      let threw = false;
+      try { await app.cipher.decryptValue(key, name, cut); } catch { threw = true; }
+      ok(threw, 'cut-off value accepted');
+    }
+    // Through the app: a record with a changed tag is never used as data, and is kept (set aside)
+    await app.store.saveDailyLog('2025-07-02', { symptoms: ['cramps'] });
+    const stored = mem.get(name)!;
+    const b = Buffer.from(stored.slice(4), 'base64');
+    b[b.length - 1] ^= 1;
+    mem.set(name, 'vc1:' + b.toString('base64'));
+    const again = await boot();
+    eq(again.store.getVivaState().dailyLogs['2025-07-02'], undefined, 'changed record not used');
+    ok(mem.has('viva-cycle:damaged:2025-07'), 'changed record kept aside, not deleted');
+    ok(mem.get('viva-cycle:damaged:2025-07')!.startsWith('vc1:'), 'and the set-aside copy is encrypted too');
+  });
+
+  await check('E15. A fresh random nonce for every write (same text, same key: never the same nonce)', async () => {
+    // NOTE: in Node this checks OUR code never supplies a fixed nonce; on the phones the nonce comes
+    // from expo-crypto itself (iOS CryptoKit AES.GCM.Nonce(), Android Cipher's own random IV).
+    await reset();
+    const app = await boot();
+    app.store.completeSetup({ name: 'Amina', dateOfBirth: null, lastPeriodStart: '2025-07-01',
+      baseline: { cycleLength: 28, periodLength: 5, regularity: 'regular' }, goal: null });
+    await settle();
+    const key = await (await import('../lib/dataKey')).readDataKey();
+    const nonces = new Set<string>();
+    const values = new Set<string>();
+    for (let i = 0; i < 2000; i++) {
+      const v = await app.cipher.encryptValue(key, 'viva-cycle:data', 'same text every time');
+      values.add(v);
+      nonces.add(Buffer.from(v.slice(4), 'base64').subarray(0, 12).toString('hex'));
+    }
+    eq([nonces.size, values.size], [2000, 2000], 'unique nonces and ciphertexts');
+    ok(!/nonce/.test(read('lib/cipher.ts').replace(/\/\/.*$/gm, '')), 'the app never passes its own nonce');
+  });
+
+  await check('E16. Setting, changing and turning off the PIN never changes the data key or loses records', async () => {
+    await seedPlainOldVersion();
+    let app = await boot();
+    await settle();
+    await settle(); // the upgrade's own saves finish first
+    const lock = req('../lib/appLock');
+    const keyBefore = keychain.get('viva-cycle.data-key');
+    // What the records SAY (each re-save gets a new nonce, so the raw text always differs)
+    const said = () => JSON.stringify([...mem.entries()].sort()
+      .filter(([k]) => k.startsWith('viva-cycle:') && k !== 'viva-cycle:data-backup')
+      .map(([k, v]) => [k, plain(v, k)]));
+    const recordsBefore = said();
+    eq(await lock.setupPin('482915', '482915'), 'saved', 'PIN on');
+    eq((await lock.changePin('482915', '730264', '730264')).ok, true, 'PIN changed');
+    app = await boot();
+    eq(sameData(app.store.getVivaState()), EXPECTED, 'records readable after the PIN change');
+    eq((await lock.disableLock('730264')).ok, true, 'PIN off');
+    app = await boot();
+    eq(sameData(app.store.getVivaState()), EXPECTED, 'records readable after turning the PIN off');
+    eq(keychain.get('viva-cycle.data-key'), keyBefore, 'same data key throughout');
+    await settle();
+    eq(said(), recordsBefore, 'stored records say exactly the same');
+    const src = read('lib/appLock.ts');
+    ok(!/data-key|readDataKey|createDataKey|encryptValue/.test(src), 'App Lock never touches the data key');
+  });
+
+  await check('E17. The write journal is encrypted too, and finishes the save after an interruption', async () => {
+    await reset();
+    let app = await boot();
+    app.store.completeSetup({ name: 'Amina', dateOfBirth: null, lastPeriodStart: '2025-07-01',
+      baseline: { cycleLength: 28, periodLength: 5, regularity: 'regular' }, goal: null });
+    await settle();
+    // A day in a NEW month changes two keys (the month + the index): that save uses the journal
+    Object.assign(faults, { writes: 0, failWritesFrom: 1 }); // journal written, then the app "closes"
+    await app.store.saveDailyLog('2025-09-03', { symptoms: ['cramps'] }).catch(() => {});
+    await settle();
+    const journal = mem.get('viva-cycle:journal');
+    ok(journal && journal.startsWith('vc1:'), 'journal encrypted');
+    ok(!SECRET.test(journal!), 'no readable personal text in the journal');
+    Object.assign(faults, { failWritesFrom: -1, writes: 0 });
+    app = await boot();
+    eq(app.store.getVivaState().dailyLogs['2025-09-03']?.symptoms, ['cramps'], 'save finished from the journal');
+    ok(!mem.has('viva-cycle:journal'), 'journal removed after use');
+    for (const k of appKeys().filter((k) => k !== 'viva-cycle:encryption')) ok(mem.get(k)!.startsWith('vc1:'), 'plain: ' + k);
   });
 
   console.warn = realWarn;

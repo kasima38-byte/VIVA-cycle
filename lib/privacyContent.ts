@@ -3,7 +3,10 @@
 // Each line must stay TRUE for the current app. Checked against the code (Oct 2026):
 //  - all records are saved with AsyncStorage on the phone (lib/vivaStore.ts, lib/dailyStorage.ts);
 //  - there is no backend, no account/login and no network code (no fetch, no analytics SDK);
-//  - VIVA adds no encryption of its own;
+//  - every saved value is encrypted with AES-256-GCM (expo-crypto) under one random key kept in
+//    expo-secure-store (Keychain / Keystore), separate from the records (lib/cipher.ts,
+//    lib/secureStorage.ts, lib/dataKey.ts, lib/encryptionSetup.ts). The key does NOT depend on
+//    the PIN: App Lock is a separate door. Not end-to-end encryption (nothing is sent anywhere);
 //  - Android: app.json allowBackup=false + plugins/withNoBackup.js data-extraction rules exclude all
 //    app data from Google backup and device transfer (checked in the generated manifest by expo
 //    prebuild; NOT yet checked on a real device). Existing backups are not removed. iOS unchanged:
@@ -15,7 +18,7 @@
 import type { ReminderSyncResult } from './notifications';
 
 export type InfoItem = {
-  icon: 'phone-portrait-outline' | 'person-circle-outline' | 'lock-open-outline' | 'cloud-upload-outline'
+  icon: 'phone-portrait-outline' | 'person-circle-outline' | 'lock-closed-outline' | 'cloud-upload-outline'
     | 'notifications-outline' | 'camera-outline';
   title: string;
   body: string;
@@ -46,11 +49,13 @@ export const YOUR_DATA: { title: string; subtitle: string; items: InfoItem[] } =
         "VIVA Cycle has no account or login, and the app doesn't send your records to a VIVA server.",
     },
     {
-      icon: 'lock-open-outline',
-      title: 'Not end-to-end encrypted',
+      icon: 'lock-closed-outline',
+      title: 'Encrypted on this phone',
       body:
-        "Local storage is not the same as end-to-end encryption. VIVA Cycle doesn't add its own encryption, " +
-        'so anyone who can unlock and use this phone may be able to open the app.',
+        'VIVA Cycle encrypts the records it saves (AES-256-GCM). The key is kept in the phone\'s secure ' +
+        'storage (iPhone Keychain / Android Keystore), separate from your records. This protects the saved ' +
+        'files, for example a copy of the app\'s storage. It is not the same as end-to-end encryption, and it ' +
+        "doesn't stop someone who can unlock this phone from opening the app: App Lock is for that.",
     },
     {
       icon: 'cloud-upload-outline',
