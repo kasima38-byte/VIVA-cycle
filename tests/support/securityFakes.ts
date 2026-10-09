@@ -71,7 +71,10 @@ async function aesDecryptAsync(sealed: AESSealedData, key: AESEncryptionKey, opt
   const out = Buffer.concat([d.update(sealed._ct), d.final()]); // throws if changed / wrong key / wrong name
   return options.output === 'base64' ? out.toString('base64') : new Uint8Array(out);
 }
-const expoCrypto = { AESEncryptionKey, AESSealedData, aesEncryptAsync, aesDecryptAsync, AESKeySize: { AES128: 128, AES192: 192, AES256: 256 } };
+const getRandomBytesAsync = async (n: number) => new Uint8Array(nodeCrypto.randomBytes(n));
+const getRandomBytes = (n: number) => new Uint8Array(nodeCrypto.randomBytes(n));
+const expoCrypto = { AESEncryptionKey, AESSealedData, aesEncryptAsync, aesDecryptAsync, getRandomBytesAsync, getRandomBytes,
+  AESKeySize: { AES128: 128, AES192: 192, AES256: 256 } };
 
 for (const [name, exports] of [['expo-secure-store', secureStore], ['expo-crypto', expoCrypto]] as const) {
   const p = req.resolve(name);

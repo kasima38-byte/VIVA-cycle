@@ -5,15 +5,20 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { listenForReminderTaps, syncReminders } from '../lib/notifications';
 import { getVivaState, loadVivaStore, retryLoadVivaStore, useVivaStore } from '../lib/vivaStore';
 import { loadTrackingSettings, useTrackingSettings } from '../lib/dailyTrackingSettingsService';
+import AppLockScreen from '../components/AppLockScreen';
+import { initAppLock, openWhenUnlocked, rootView, useAppLock } from '../lib/appLockSession';
 
 export default function RootLayout() {
   const { loaded, loadError, periods, baseline, goal, reminders, discreetNotifications } = useVivaStore();
   const { loaded: settingsLoaded } = useTrackingSettings();
+  const { gate } = useAppLock();
 
   useEffect(() => {
+    initAppLock();
     loadVivaStore();
     loadTrackingSettings();
-    return listenForReminderTaps((url) => router.push(url as any));
+    // A reminder tapped while locked opens its screen only after the PIN
+    return listenForReminderTaps((url) => openWhenUnlocked(url, (u) => router.push(u as any)));
   }, []);
 
   // Rebuild reminders whenever anything they depend on changes (and on every launch)
@@ -21,7 +26,17 @@ export default function RootLayout() {
     if (loaded && !loadError) syncReminders(getVivaState());
   }, [loaded, loadError, periods, baseline, goal, reminders, discreetNotifications]);
 
-  if (!loaded || !settingsLoaded) {
+  // App Lock comes first: until the PIN is checked, NO VIVA screen is rendered (lib/appLockSession.ts)
+  const view = rootView(gate);
+  if (view === 'lock') {
+    return (
+      <SafeAreaProvider>
+        <AppLockScreen />
+      </SafeAreaProvider>
+    );
+  }
+
+  if (view === 'loading' || !loaded || !settingsLoaded) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FAEFF5' }}>
         <ActivityIndicator color="#E9006F" />

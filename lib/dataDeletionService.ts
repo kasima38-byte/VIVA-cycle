@@ -12,6 +12,7 @@ import {
 import { cancelAllReminders, syncReminders } from './notifications';
 import { deleteAllStoredData, getVivaState } from './vivaStore';
 import { forgetDataKey } from './encryptionSetup';
+import { forgetAppLock } from './appLockSession';
 
 let running: Promise<DeleteAllResult> | null = null;
 
@@ -46,6 +47,12 @@ async function run(): Promise<DeleteAllResult> {
       await forgetDataKey();
     } catch {
       console.warn('VIVA: could not remove the encryption key');
+    }
+    // App Lock settings go too: a fresh start has no PIN (her explicit, double-confirmed choice)
+    try {
+      await forgetAppLock();
+    } catch {
+      console.warn('VIVA: could not remove App Lock settings');
     }
     resetSettingsAfterDeletion();
     resetProfileExtras();

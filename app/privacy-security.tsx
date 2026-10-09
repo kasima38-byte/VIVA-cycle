@@ -9,6 +9,7 @@ import { useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import IntroCard from '../components/IntroCard';
+import SettingsRow from '../components/SettingsRow';
 import VivaToggle from '../components/VivaToggle';
 import { colors, radius, spacing } from '../constants/theme';
 import { syncReminders } from '../lib/notifications';
@@ -16,6 +17,8 @@ import {
   DISCREET, DiscreetNotice, InfoItem, MANAGE_DATA, PERMISSIONS, PRIVACY_HEADER, YOUR_DATA, discreetNotice,
 } from '../lib/privacyContent';
 import { useDeleteAllData } from '../lib/useDeleteAllData';
+import { useAppLock } from '../lib/appLockSession';
+import { APP_LOCK } from '../lib/appLockText';
 import { getVivaState, setDiscreetNotifications, useVivaStore } from '../lib/vivaStore';
 
 function InfoCard({ items }: { items: InfoItem[] }) {
@@ -126,6 +129,31 @@ function DiscreetNotificationsCard() {
   );
 }
 
+/** App Lock: set up, change or turn off the PIN. Every change happens on the PIN screen,
+ *  which checks the current PIN first; nothing changes just by opening this screen. */
+function AppLockSection() {
+  const { lockOn } = useAppLock();
+  const open = (mode: 'setup' | 'change' | 'disable') => router.push({ pathname: '/app-lock-pin', params: { mode } });
+  return (
+    <View style={styles.section}>
+      <SectionHeading title={APP_LOCK.sectionTitle} subtitle={APP_LOCK.sectionSubtitle} />
+      {lockOn === false && (
+        <SettingsRow icon="keypad" title={APP_LOCK.turnOn} subtitle={APP_LOCK.turnOnBody} onPress={() => open('setup')} />
+      )}
+      {lockOn === true && (
+        <>
+          <SettingsRow icon="keypad" title={APP_LOCK.change} subtitle={APP_LOCK.changeBody} onPress={() => open('change')} />
+          <SettingsRow icon="lock-open" title={APP_LOCK.turnOff} subtitle={APP_LOCK.turnOffBody} onPress={() => open('disable')} />
+        </>
+      )}
+      <Text style={styles.note} accessibilityLiveRegion="polite">
+        {lockOn === true ? APP_LOCK.statusOn : lockOn === false ? APP_LOCK.statusOff : APP_LOCK.statusUnknown}
+      </Text>
+      <Text style={styles.note}>{APP_LOCK.note}</Text>
+    </View>
+  );
+}
+
 export default function PrivacySecurityScreen() {
   const { requestDeleteAll, deleting, lastOutcome } = useDeleteAllData();
   // Only a failed or partial delete is shown here; a full delete moves on to Welcome
@@ -181,6 +209,9 @@ export default function PrivacySecurityScreen() {
 
           {/* ---------- Discreet Notifications ---------- */}
           <DiscreetNotificationsCard />
+
+          {/* ---------- App Lock ---------- */}
+          <AppLockSection />
 
           {/* ---------- C. Manage Your Data ---------- */}
           <View style={styles.section}>
