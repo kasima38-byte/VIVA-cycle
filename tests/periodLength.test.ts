@@ -1,9 +1,9 @@
 // Period Length checks: Calendar bleeding days -> Insights bars + Average.
 // Uses made-up 2030 dates only - never real user data.
 // Run: npx -y tsx tests/periodLength.test.ts
-import { buildPeriodRecords, periodLengthView, PeriodRangeKey, prefillPeriodDays } from '../lib/periodLength';
-import { derivePeriodLogs } from '../lib/periodTracking';
-import { calculateCycle } from '../lib/cycleEngine';
+import { buildPeriodRecords, periodLengthView, PeriodRangeKey, periodDetailRows } from '../lib/periodLength';
+import { bleedingMarks, derivePeriodLogs } from '../lib/periodTracking';
+import { calculateCycle, predictCycles } from '../lib/cycleEngine';
 
 type Logs = Record<string, { period: 'yes' | 'no' }>;
 const d = (md: string) => '2030-' + md;
@@ -137,26 +137,6 @@ check('G. See Details lists the same completed periods as the bars (every range)
   });
 });
 
-check('H1. Pre-fill: logged on Day 1 itself -> only Day 1 (no future days)', () => {
-  eq(prefillPeriodDays(d('10-03'), 5, d('10-03'), null, {}), [d('10-03')], 'days');
-});
-
-check('H2. Pre-fill: logged late with Settings 4 -> Day 1 to Day 4', () => {
-  eq(prefillPeriodDays(d('10-03'), 4, d('10-09'), null, {}), days('10', 3, 6).map(d), 'days');
-});
-
-check('H3. Pre-fill: Settings "Not sure" -> Day 1 only', () => {
-  eq(prefillPeriodDays(d('10-03'), null, d('10-09'), null, {}), [d('10-03')], 'days');
-});
-
-check('H4. Pre-fill: stops before the next logged period', () => {
-  eq(prefillPeriodDays(d('09-28'), 7, d('10-09'), d('10-01'), {}), days('09', 28, 30).map(d), 'days');
-});
-
-check('H5. Pre-fill: stops at a day she marked "no period"', () => {
-  eq(prefillPeriodDays(d('10-03'), 5, d('10-09'), null, logs([], ['10-05']) as any), [d('10-03'), d('10-04')], 'days');
-});
-
 check('I1. Finished periods carry their end; the latest (maybe ongoing) does not', () => {
   eq(derivePeriodLogs(S443 as any).map((p: any) => p.start.slice(5) + '>' + (p.end ? p.end.slice(5) : '-')),
     ['07-01>07-04', '08-01>08-04', '09-01>09-03', '10-03>-'], 'periods');
@@ -170,6 +150,91 @@ check('I2. A period with a missing day gets no end (not used for predictions)', 
 check('I3. Prediction uses confirmed history (4,4,3 -> 4 days), not Settings (3)', () => {
   const est = calculateCycle({ cycleLength: null, periodLength: 3, regularity: 'not_sure' } as any, derivePeriodLogs(S443 as any), T);
   eq(est?.periodLengthUsed, 4, 'periodLengthUsed');
+});
+
+// ---------- Prediction -> actual transition (acceptance tests T1-T7) ----------
+const BASE = { cycleLength: null, periodLength: 3, regularity: 'not_sure' } as any; // Settings = 3
+const HIST = [...days('07', 1, 4), ...days('08', 1, 4), ...days('09', 1, 3)];
+let calMonth: any = null;
+try { calMonth = require('../constants/calendarModel').buildCalendarMonth; }
+catch (e: any) { console.log('NOTE  Calendar model could not load in tests - calendar checks SKIPPED: ' + e.message); }
+function state(yes: string[], today: string) {
+  const l = logs(yes) as any;
+  return { l, today, records: buildPeriodRecords(l, today, 3), est: calculateCycle(BASE, derivePeriodLogs(l), today)! };
+}
+function calPredicted(s: ReturnType<typeof state>, date: string, expected: boolean) {
+  if (!calMonth) return;
+  const month = calMonth(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, derivePeriodLogs(s.l), s.est, [], s.today, bleedingMarks(s.l), { mucus: {} });
+  const found: any[] = [];
+  const walk = (x: any) => {
+    if (Array.isArray(x)) x.forEach(walk);
+    else if (x && typeof x === 'object') { if (Object.values(x).includes(date)) found.push(x); else Object.values(x).forEach(walk); }
+  };
+  walk(month);
+  const cell = found.find((c) => 'isPredictedPeriod' in c);
+  if (!cell) throw new Error('no calendar cell for ' + date + ' (found keys: ' + Object.keys(found[0] ?? {}).join(',') + ')');
+  eq(!!cell.isPredictedPeriod, expected, 'Calendar ' + date + ' predicted');
+}
+const cycleView = (s: ReturnType<typeof state>) => periodLengthView(s.records, 'cycle', s.today, s.est.periodLengthUsed);
+
+check('T1. Predicted period, no bleeding: shown predicted, never counted', () => {
+  const s = state(HIST, d('09-28'));
+  eq(s.est.periodLengthUsed, 4, 'estimate (history 4,4)');
+  eq(s.records.length, 3, 'confirmed periods');
+  const v = cycleView(s);
+  eq(bars(v), ['Jul 4', 'Aug 4', 'Sep 3'], 'bars'); eq(v.averageText, '3.7 days', 'average');
+  calPredicted(s, predictCycles(s.est, 1)[0].periodStart, true);
+});
+
+check('T2. One confirmed day: in progress, estimate shown, average unchanged', () => {
+  const s = state([...HIST, '10-03'], d('10-03'));
+  const cur = s.records[s.records.length - 1];
+  eq(cur.status, 'active', 'status'); eq(cur.loggedInWindow, 1, 'days');
+  const v = cycleView(s);
+  eq(bars(v), ['Jul 4', 'Aug 4', 'Sep 3'], 'bars'); eq(v.averageText, '3.7 days', 'average');
+  eq(periodDetailRows(v)[0].value, '1 day so far', 'details');
+  if (!v.notes.some((n) => n.startsWith('Estimated period length: 4 days'))) throw new Error('no estimate note: ' + JSON.stringify(v.notes));
+  calPredicted(s, d('10-03'), false); calPredicted(s, d('10-05'), true);
+});
+
+check('T3. Consecutive days: count updates, still not in the average', () => {
+  const s = state([...HIST, ...days('10', 3, 6)], d('10-06'));
+  eq(s.records[s.records.length - 1].status, 'active', 'status');
+  const v = cycleView(s);
+  eq(periodDetailRows(v)[0].value, '4 days so far', 'details'); eq(v.averageText, '3.7 days', 'average');
+  calPredicted(s, d('10-06'), false);
+});
+
+check('T4. Completed period: actual length replaces prediction in history', () => {
+  const s = state([...HIST, ...days('10', 3, 6)], d('10-09'));
+  eq(s.records[s.records.length - 1].status, 'completed', 'status');
+  const v = cycleView(s);
+  eq(bars(v), ['Jul 4', 'Aug 4', 'Sep 3', 'Oct 4'], 'bars'); eq(v.averageText, '3.8 days', 'average');
+  eq(periodDetailRows(v)[0].value, '4 days', 'details');
+  calPredicted(s, d('10-04'), false);
+});
+
+check('T5. Correction removes a day: episode and average recalculate', () => {
+  const s = state([...HIST, ...days('10', 3, 5)], d('10-09'));
+  const v = cycleView(s);
+  eq(bars(v), ['Jul 4', 'Aug 4', 'Sep 3', 'Oct 3'], 'bars'); eq(v.averageText, '3.5 days', 'average');
+});
+
+check('T6. Predicted period passes with no bleeding: nothing counted', () => {
+  const s = state(HIST, d('10-20'));
+  eq(s.records.length, 3, 'confirmed periods');
+  const v = cycleView(s);
+  eq(bars(v), ['Jul 4', 'Aug 4', 'Sep 3'], 'bars'); eq(v.averageText, '3.7 days', 'average');
+});
+
+check('T7. Completed period is never duplicated (bars or details, every range)', () => {
+  const s = state([...HIST, ...days('10', 3, 6)], d('10-09'));
+  RANGES.forEach((rg) => {
+    const v = periodLengthView(s.records, rg, s.today, s.est.periodLengthUsed);
+    const labels = v.chart.map((c) => c.label), keys = periodDetailRows(v).map((r) => r.key);
+    eq(new Set(labels).size, labels.length, rg + ' bars unique');
+    eq(new Set(keys).size, keys.length, rg + ' details unique');
+  });
 });
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

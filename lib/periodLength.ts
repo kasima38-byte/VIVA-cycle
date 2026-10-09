@@ -113,7 +113,7 @@ export type PeriodLengthView = {
   chart: { label: string; value: number; current: boolean }[];
 };
 
-export function periodLengthView(all: PeriodRecord[], range: PeriodRangeKey, today: string): PeriodLengthView {
+export function periodLengthView(all: PeriodRecord[], range: PeriodRangeKey, today: string, estimatedLength: number | null = null): PeriodLengthView {
   const inRange = periodsInRange(all, range, today);
   const counted = inRange.filter((p) => p.countsForAverage);
   const active = inRange.find((p) => p.status === 'active') ?? null;
@@ -133,6 +133,8 @@ export function periodLengthView(all: PeriodRecord[], range: PeriodRangeKey, tod
   }
   if (chartPeriods.length === 1) notes.push('Based on 1 logged period. Log more periods to see your pattern.');
   else if (chartPeriods.length > 1) notes.push('Based on your last ' + chartPeriods.length + ' periods');
+  // Engine prediction (history -> Settings -> default): an ESTIMATE only, never a bar or in the average
+  if (range === 'cycle' && estimatedLength) notes.push('Estimated period length: ' + daysText(estimatedLength) + ' (prediction - not included in the average)');
   const details = range === 'cycle' ? [...chartPeriods, ...inRange.filter((p) => !chartPeriods.includes(p))] : inRange;
   return {
     inRange,
@@ -189,21 +191,4 @@ export function calendarTrackingCard(records: PeriodRecord[], logs: Logs, today:
     return { kind: 'tracking', heading: 'Period tracking', text: 'Today is logged as a bleeding day.', started, logged, todayPrompt: null };
   }
   return { kind: 'tracking', heading: 'Track your period', text: 'Tap each day you have bleeding to record your period length.', started, logged, todayPrompt };
-}
-
-// ---------- Log Period pre-fill (pure) ----------
-
-/** Days Log Period marks as bleeding: Day 1 + the usual period length from Settings.
- *  Never past today, never into the next logged period, and stops at any day she already
- *  marked "no period". Settings "Not sure" (null) -> Day 1 only. She adjusts on the Calendar. */
-export function prefillPeriodDays(
-  start: string, usualLength: number | null, today: string, nextStart: string | null, logs: Logs
-): string[] {
-  const days = [start];
-  for (let i = 1; usualLength && i < usualLength; i++) {
-    const day = addDays(start, i);
-    if (day > today || (nextStart && day >= nextStart) || logs[day]?.period === 'no') break;
-    days.push(day);
-  }
-  return days;
 }

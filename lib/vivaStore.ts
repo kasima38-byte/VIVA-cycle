@@ -6,7 +6,6 @@
 // in lib/cycleEngine.ts, so a prediction can never become "confirmed".
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { prefillPeriodDays } from './periodLength';
 import { useSyncExternalStore } from 'react';
 import {
   CycleBaseline, DateStr, Goal, PeriodLog, PeriodLogResult,
@@ -356,13 +355,8 @@ export function completeSetup(input: SetupInput) {
 export function logPeriod(start: DateStr): PeriodLogResult {
   const { result } = applyPeriodLog(state.periods, start);
   if (result.kind === 'added') {
-    // Pre-fill Day 1 + the Settings period length (up to today); she adjusts on the Calendar
-    const next = state.periods.map((p) => p.start).filter((s) => s > start).sort()[0] ?? null;
-    const changes: PeriodChanges = {};
-    prefillPeriodDays(start, state.baseline.periodLength, todayLocal(), next, state.dailyLogs).forEach((d) => {
-      changes[d] = 'yes';
-    });
-    void updateDailyLogs(withPeriodChanges(state.dailyLogs, changes, new Date().toISOString()));
+    // Day 1 only. Remaining days are PREDICTED until she taps them on the Calendar.
+    void updateDailyLogs(withPeriodChanges(state.dailyLogs, { [start]: 'yes' }, new Date().toISOString()));
   }
   return result;
 }

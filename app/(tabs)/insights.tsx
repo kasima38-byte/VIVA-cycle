@@ -50,7 +50,7 @@ export default function InsightsScreen() {
   const cycleAvg = average(records.map((r) => r.cycleLength));
   // Period Length: from actual logged bleeding days (Calendar), real 3/6/12-month windows
   const periodsAll = useMemo(() => buildPeriodRecords(dailyLogs, today, viva.baseline.periodLength), [dailyLogs, today, viva.baseline.periodLength]);
-  const periodView = useMemo(() => periodLengthView(periodsAll, range, today), [periodsAll, range, today]);
+  const periodView = useMemo(() => periodLengthView(periodsAll, range, today, est?.periodLengthUsed ?? null), [periodsAll, range, today, est]);
   const periodRows = useMemo(() => periodDetailRows(periodView), [periodView]);
   const [periodDetailsOpen, setPeriodDetailsOpen] = useState(false);
   const regularity = calculateCycleRegularity(records);
