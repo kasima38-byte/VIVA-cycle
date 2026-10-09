@@ -331,19 +331,21 @@ function ok(cond: unknown, what: string) {
     const all = [words.DELETE_ALL_CONFIRM.body, words.DELETE_ALL_FINAL.body].join(' ');
     ok(/can't be undone/.test(words.DELETE_ALL_CONFIRM.body), 'says it cannot be undone');
     ok(/reminders will be cancelled/.test(words.DELETE_ALL_CONFIRM.body), 'says reminders are cancelled');
-    ok(/records and settings stored on this phone/.test(words.DELETE_ALL_CONFIRM.body), 'says what is removed');
-    ok(/not copies made outside the app/.test(all), 'says outside copies are not removed');
+    ok(/records and settings VIVA Cycle stores on this phone/.test(words.DELETE_ALL_CONFIRM.body), 'says what is removed');
+    ok(/outside the app's control/.test(all) && /not necessarily deleted/.test(all), 'says outside copies are not necessarily removed');
     ok(!/encrypt/i.test(all), 'no encryption claims');
   });
 
   await check('D10. Deletion only runs after two confirmations, never from navigation', async () => {
     const root = path.resolve(req.resolve('../package.json'), '..');
     const hook = fs.readFileSync(path.join(root, 'lib/useDeleteAllData.ts'), 'utf8');
-    const finalStep = hook.slice(hook.indexOf('DELETE_ALL_FINAL.title'));
-    ok(/DELETE_ALL_FINAL\.confirm[^\n]*runDelete/.test(finalStep), 'runDelete only on the final confirm button');
-    eq((hook.match(/runDelete\(\)/g) ?? []).length, 1, 'runDelete called from exactly one place');
-    for (const f of ['app/(tabs)/profile.tsx', 'app/_layout.tsx']) {
-      ok(!/deleteAllUserData|deleteAllStoredData/.test(fs.readFileSync(path.join(root, f), 'utf8')), f + ' must not delete');
+    eq((hook.match(/deleteAllUserData\(\)/g) ?? []).length, 1, 'deleteAllUserData called from exactly one place');
+    ok(/runDeleteFlow\(/.test(hook), 'the hook goes through the two-step flow');
+    const flow = fs.readFileSync(path.join(root, 'lib/deleteFlow.ts'), 'utf8');
+    ok(flow.indexOf('ask(FIRST_DIALOG)') < flow.indexOf('ask(FINAL_DIALOG)') && flow.indexOf('ask(FINAL_DIALOG)') < flow.indexOf('deps.run()'),
+      'run only after both dialogs');
+    for (const f of ['app/(tabs)/profile.tsx', 'app/_layout.tsx', 'app/privacy-security.tsx']) {
+      ok(!/deleteAllUserData|deleteAllStoredData/.test(fs.readFileSync(path.join(root, f), 'utf8')), f + ' must not delete directly');
     }
   });
 

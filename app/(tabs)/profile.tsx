@@ -22,7 +22,7 @@ const healthRows: Row[] = [
   { icon: 'water', title: 'Period history', subtitle: 'See, edit or delete the periods you logged', route: '/period-history' },
   { icon: 'flag', title: 'My Health Goals', subtitle: 'Set and track your health goals' },
   { icon: 'bar-chart', title: 'My Data', subtitle: 'View, export and manage your data' },
-  { icon: 'lock-closed', title: 'Privacy & Security', subtitle: 'Privacy, permissions and account security' },
+  { icon: 'lock-closed', title: 'Privacy & Security', subtitle: 'Privacy, permissions and account security', route: '/privacy-security' },
 ];
 
 const supportRows: Row[] = [

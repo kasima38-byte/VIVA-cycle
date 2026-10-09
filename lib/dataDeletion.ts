@@ -13,11 +13,11 @@ export type DeleteAllResult = {
 export const DELETE_ALL_CONFIRM = {
   title: 'Delete all your VIVA Cycle data?',
   body:
-    'This removes all VIVA Cycle records and settings stored on this phone: your periods, Daily Tracking, ' +
-    'cycle settings, goal, profile details and reminder choices.\n\n' +
+    'This deletes the personal records and settings VIVA Cycle stores on this phone: your periods, Daily ' +
+    'Tracking, cycle settings, goal, profile details and reminder choices.\n\n' +
     'All scheduled VIVA reminders will be cancelled.\n\n' +
-    "This can't be undone. It only removes what the VIVA Cycle app stores on this phone, not copies " +
-    'made outside the app, such as phone or cloud backups.',
+    "This can't be undone.\n\n" +
+    "Data outside the app's control, such as existing phone or cloud backups, is not necessarily deleted.",
   cancel: 'Cancel',
   continue: 'Continue',
 };

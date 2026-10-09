@@ -1,61 +1,60 @@
-// VIVA Cycle - the confirmation flow for "Delete all my data".
-// Nothing is deleted when a screen opens or a row is tapped: requestDeleteAll() only shows the
-// first confirmation. Deletion starts only after she confirms twice.
-//
-// Usage (Privacy & Security screen, next step):
-//   const { requestDeleteAll, deleting } = useDeleteAllData();
-//   <Pressable onPress={requestDeleteAll} disabled={deleting}>…Delete all my data…</Pressable>
+// VIVA Cycle - "Delete all my data" for screens (used by app/privacy-security.tsx).
+// Nothing is deleted when a screen opens: requestDeleteAll() only shows the first confirmation,
+// and deletion starts only after she confirms twice (rules in lib/deleteFlow.ts).
 
 import { router } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { AccessibilityInfo, Alert } from 'react-native';
-import { DELETE_ALL_CONFIRM, DELETE_ALL_FINAL, deleteAllResultMessage } from './dataDeletion';
 import { deleteAllUserData } from './dataDeletionService';
+import { Dialog, DeleteFlowOutcome, Message, runDeleteFlow } from './deleteFlow';
+
+/** A phone dialog that resolves true only for the confirm button (back/outside tap = cancel). */
+function ask(d: Dialog): Promise<boolean> {
+  return new Promise((resolve) => {
+    Alert.alert(
+      d.title,
+      d.body,
+      [
+        { text: d.cancel, style: 'cancel', onPress: () => resolve(false) },
+        { text: d.confirm, style: 'destructive', onPress: () => resolve(true) },
+      ],
+      { cancelable: true, onDismiss: () => resolve(false) }
+    );
+  });
+}
+
+function tell(m: Message, then?: () => void) {
+  AccessibilityInfo.announceForAccessibility(m.title);
+  Alert.alert(m.title, m.body, [{ text: 'OK', onPress: then }], { cancelable: !then });
+}
 
 export function useDeleteAllData() {
   const [deleting, setDeleting] = useState(false);
+  const [lastOutcome, setLastOutcome] = useState<DeleteFlowOutcome | null>(null);
   const busy = useRef(false);
 
-  const runDelete = useCallback(async () => {
+  const requestDeleteAll = useCallback(async () => {
     if (busy.current) return;
     busy.current = true;
-    setDeleting(true);
-    let result;
     try {
-      result = await deleteAllUserData();
-    } catch {
-      result = { status: 'failed', dataDeleted: 'nothing', remindersCancelled: false } as const;
+      const outcome = await runDeleteFlow({
+        ask,
+        run: async () => {
+          setDeleting(true);
+          try {
+            return await deleteAllUserData();
+          } finally {
+            setDeleting(false);
+          }
+        },
+        tell,
+        goToSafeScreen: () => router.replace('/welcome'),
+      });
+      setLastOutcome(outcome);
     } finally {
       busy.current = false;
-      setDeleting(false);
-    }
-    const msg = deleteAllResultMessage(result);
-    AccessibilityInfo.announceForAccessibility(msg.title);
-    if (result.dataDeleted === 'all') {
-      // Everything she set up is gone: start again from Welcome
-      Alert.alert(msg.title, msg.body, [{ text: 'OK', onPress: () => router.replace('/welcome') }], {
-        cancelable: false,
-      });
-    } else {
-      Alert.alert(msg.title, msg.body);
     }
   }, []);
 
-  const requestDeleteAll = useCallback(() => {
-    if (busy.current) return;
-    Alert.alert(DELETE_ALL_CONFIRM.title, DELETE_ALL_CONFIRM.body, [
-      { text: DELETE_ALL_CONFIRM.cancel, style: 'cancel' },
-      {
-        text: DELETE_ALL_CONFIRM.continue,
-        style: 'destructive',
-        onPress: () =>
-          Alert.alert(DELETE_ALL_FINAL.title, DELETE_ALL_FINAL.body, [
-            { text: DELETE_ALL_FINAL.cancel, style: 'cancel' },
-            { text: DELETE_ALL_FINAL.confirm, style: 'destructive', onPress: () => void runDelete() },
-          ]),
-      },
-    ]);
-  }, [runDelete]);
-
-  return { requestDeleteAll, deleting };
+  return { requestDeleteAll, deleting, lastOutcome };
 }
