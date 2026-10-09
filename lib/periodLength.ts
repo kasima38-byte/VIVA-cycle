@@ -135,6 +135,11 @@ export function periodLengthView(all: PeriodRecord[], range: PeriodRangeKey, tod
   else if (chartPeriods.length > 1) notes.push('Based on your last ' + chartPeriods.length + ' periods');
   // Engine prediction (history -> Settings -> default): an ESTIMATE only, never a bar or in the average
   if (range === 'cycle' && estimatedLength) notes.push('Estimated period length: ' + daysText(estimatedLength) + ' (prediction - not included in the average)');
+  // Short month labels; if a month name repeats (e.g. Oct 2025 + Oct 2026), every label gets a 2-digit year
+  const shortLabels = chartPeriods.map((p) => monthOf(p.start));
+  const chartLabels = new Set(shortLabels).size < shortLabels.length
+    ? chartPeriods.map((p) => monthOf(p.start) + " '" + p.start.slice(2, 4))
+    : shortLabels;
   const details = range === 'cycle' ? [...chartPeriods, ...inRange.filter((p) => !chartPeriods.includes(p))] : inRange;
   return {
     inRange,
@@ -147,7 +152,7 @@ export function periodLengthView(all: PeriodRecord[], range: PeriodRangeKey, tod
     statusText: status ? status.text : active ? 'Tracking in progress' : 'No completed period data yet',
     subtitle: inRange.length > 0 ? 'Your logged bleeding days' : 'Tap bleeding days on the Calendar to track your period length.',
     notes,
-    chart: chartPeriods.map((p, i) => ({ label: monthOf(p.start), value: p.recordedDays, current: i === chartPeriods.length - 1 })),
+    chart: chartPeriods.map((p, i) => ({ label: chartLabels[i], value: p.recordedDays, current: i === chartPeriods.length - 1 })),
   };
 }
 

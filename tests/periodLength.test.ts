@@ -289,5 +289,19 @@ check('U8. See Details shows the year when the list spans two years', () => {
   eq(periodDetailRows(view(logs(HIST2), '6m', T)).map((r) => r.month), ['Sep', 'Aug', 'Jul'], 'single year: no year shown');
 });
 
+// ---------- Chart labels across two years (V1-V2) ----------
+check('V1. Same month in two years -> every bar label gets a 2-digit year', () => {
+  const l: any = logs([...HIST2, ...days('10', 3, 6)]);
+  ['2029-10-25', '2029-10-26', '2029-10-27', '2029-10-28'].forEach((k) => (l[k] = { period: 'yes' }));
+  const today = d('10-20'); // 12 Months = from 2029-10-20
+  eq(bars(view(l, '12m', today)), ["Oct '29 4", "Jul '30 4", "Aug '30 4", "Sep '30 3", "Oct '30 4"], '12m labels');
+  eq(bars(view(l, 'cycle', today)), ["Oct '29 4", "Jul '30 4", "Aug '30 4", "Sep '30 3", "Oct '30 4"], 'This Cycle labels');
+  eq(view(l, '12m', today).averageText, '3.8 days', 'average unchanged by labels');
+});
+
+check('V2. Unique months keep the short labels (no year)', () => {
+  eq(bars(view(logs(HIST2), '12m', T)), ['Jul 4', 'Aug 4', 'Sep 3'], 'labels');
+});
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
