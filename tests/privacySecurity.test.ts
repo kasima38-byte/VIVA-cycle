@@ -107,13 +107,13 @@ function eq(a: unknown, b: unknown, what: string) {
   });
 
   // ---------- 2. Content matches the real architecture ----------
-  await check('S2a. "Your Data" says local AsyncStorage, no account/server, not E2E encrypted, phone backups', async () => {
+  await check('S2a. "Your Data" says local AsyncStorage, no account/server, not E2E encrypted, backup policy', async () => {
     const { content } = await boot();
     const text = content.YOUR_DATA.items.map((i: any) => i.title + ' ' + i.body).join(' ');
     ok(/on this phone/.test(text) && /AsyncStorage/.test(text), 'local AsyncStorage');
     ok(/no account or login/.test(text) && /doesn't send your records to a VIVA server/.test(text), 'no account/server');
     ok(/not the same as end-to-end encryption/.test(text) && /doesn't add its own encryption/.test(text), 'encryption honesty');
-    ok(/backup settings/.test(text) && /controlled by your phone, not by VIVA Cycle/.test(text), 'backups');
+    ok(/Google backups/.test(text) && /doesn't remove backups made before/.test(text) && /follow your phone settings/.test(text), 'backups');
   });
 
   await check('S2b. No false claims anywhere on the screen', async () => {

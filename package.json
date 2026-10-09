@@ -29,7 +29,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "tsx tests/periodLength.test.ts && tsx tests/persistence.test.ts && tsx tests/dataDeletion.test.ts && tsx tests/privacySecurity.test.ts && tsx tests/discreetNotifications.test.ts"
+    "test": "tsx tests/periodLength.test.ts && tsx tests/persistence.test.ts && tsx tests/dataDeletion.test.ts && tsx tests/privacySecurity.test.ts && tsx tests/discreetNotifications.test.ts && tsx tests/backupAndLogout.test.ts"
   },
   "private": true
 }

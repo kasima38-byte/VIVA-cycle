@@ -4,7 +4,10 @@
 //  - all records are saved with AsyncStorage on the phone (lib/vivaStore.ts, lib/dailyStorage.ts);
 //  - there is no backend, no account/login and no network code (no fetch, no analytics SDK);
 //  - VIVA adds no encryption of its own;
-//  - app.json sets no backup rule, so the phone's backup settings decide (not verified on a build);
+//  - Android: app.json allowBackup=false + plugins/withNoBackup.js data-extraction rules exclude all
+//    app data from Google backup and device transfer (checked in the generated manifest by expo
+//    prebuild; NOT yet checked on a real device). Existing backups are not removed. iOS unchanged:
+//    iCloud / computer backups follow the phone's settings;
 //  - permissions asked: notifications (lib/notifications.ts, only when a reminder is switched on)
 //    and camera / photo library (app/personal-information.tsx, only when changing the photo).
 // If any of that changes, update this file AND tests/privacySecurity.test.ts.
@@ -51,10 +54,11 @@ export const YOUR_DATA: { title: string; subtitle: string; items: InfoItem[] } =
     },
     {
       icon: 'cloud-upload-outline',
-      title: 'Phone backups',
+      title: 'Backups',
       body:
-        "Your phone's own backup settings, such as Google or iCloud backup, may include app data. " +
-        'Those backups are controlled by your phone, not by VIVA Cycle.',
+        'On Android, VIVA Cycle asks the phone to leave its data out of Google backups and transfers to a new ' +
+        "phone. This doesn't remove backups made before. On iPhone, iCloud and computer backups follow your " +
+        'phone settings.',
     },
   ],
 };

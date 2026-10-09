@@ -61,13 +61,9 @@ export default function ProfileScreen() {
     }
   };
 
-  const confirmLogOut = () => {
-    Alert.alert('Log out of VIVA Cycle?', 'Are you sure you want to log out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Log Out', style: 'destructive', onPress: () => {} }, // Log out is not built yet (no accounts) - see QA report
-    ]);
-  };
-  
+  // No Log Out: VIVA Cycle has no accounts, so there is nothing to log out of. Her data stays on
+  // this phone; deleting it is an explicit action in Privacy & Security.
+
   const renderRows = (rows: Row[]) => (
     <View style={styles.rowList}>
       {rows.map((r) => (
@@ -147,15 +143,6 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>Support</Text>
           {renderRows(supportRows)}
 
-          <Pressable
-            style={styles.logout}
-            onPress={confirmLogOut}
-            accessibilityRole="button"
-            accessibilityLabel="Log out"
-          >
-            <Ionicons name="log-out-outline" size={18} color={colors.magenta} />
-            <Text style={styles.logoutText}>Log Out</Text>
-          </Pressable>
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -216,15 +203,4 @@ const styles = StyleSheet.create({
   pregnancyTitle: { fontSize: 16, fontWeight: '700', color: colors.navy },
   pregnancyBody: { fontSize: 13, color: colors.textSecondary, marginTop: 3 },
   pregnancyLink: { fontSize: 13, fontWeight: '600', color: colors.ovulationPurple, marginTop: 8 },
-  logout: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: colors.pinkSoft,
-    borderRadius: radius.lg,
-    paddingVertical: 16,
-    marginTop: spacing.sm,
-  },
-  logoutText: { fontSize: 15.5, fontWeight: '700', color: colors.magenta },
 });
