@@ -5,7 +5,7 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { todayLocal } from './cycleEngine';
-import { planReminders, ReminderTrigger } from './reminders';
+import { planReminders, presentReminders, ReminderTrigger } from './reminders';
 import type { VivaState } from './vivaStore';
 
 const CHANNEL = 'viva-reminders';
@@ -55,30 +55,57 @@ function toTrigger(t: ReminderTrigger): Notifications.NotificationTriggerInput {
   }
 }
 
-let syncing: Promise<void> = Promise.resolve();
+let syncing: Promise<unknown> = Promise.resolve();
 
-/** Replace all scheduled VIVA reminders with the current plan. Safe to call often. */
-export function syncReminders(state: VivaState): Promise<void> {
-  syncing = syncing.then(async () => {
-    try {
-      await Notifications.cancelAllScheduledNotificationsAsync();
-      const plan = planReminders(state, todayLocal());
-      if (plan.length === 0) return;
-      const perm = await Notifications.getPermissionsAsync();
-      if (!perm.granted) return;
-      await ensureChannel();
-      for (const r of plan) {
-        await Notifications.scheduleNotificationAsync({
-          identifier: r.id,
-          content: { title: r.title, body: r.body, data: { url: r.url } },
-          trigger: toTrigger(r.trigger),
-        });
-      }
-    } catch (e) {
-      console.warn('VIVA: could not schedule reminders', e);
+export type ReminderSyncResult =
+  | { status: 'ok'; scheduled: number }
+  /** Reminders are switched on, but the phone doesn't allow VIVA notifications: none scheduled. */
+  | { status: 'noPermission' }
+  /** Old reminders could not be (confirmed) cancelled, so some may still show their old text. */
+  | { status: 'cancelFailed' }
+  /** Old reminders were cancelled, but only `scheduled` of `expected` new ones were scheduled. */
+  | { status: 'scheduleFailed'; scheduled: number; expected: number };
+
+/** Replace all scheduled VIVA reminders with the current plan. Safe to call often.
+ *  The phone can't edit a scheduled notification's text, so every sync cancels ALL of this app's
+ *  scheduled reminders, checks none are left, then schedules the plan again with the same ids and
+ *  times. Text follows her Discreet Notifications setting. Never asks for permission.
+ *  Never throws: the result says exactly what happened. Logs never include reminder text. */
+export function syncReminders(state: VivaState): Promise<ReminderSyncResult> {
+  const run = syncing.then(() => doSync(state));
+  syncing = run;
+  return run;
+}
+
+async function doSync(state: VivaState): Promise<ReminderSyncResult> {
+  try {
+    await Notifications.cancelAllScheduledNotificationsAsync(); // this app's reminders only
+    const left = await Notifications.getAllScheduledNotificationsAsync();
+    if (left.length > 0) throw new Error('still scheduled');
+  } catch {
+    console.warn('VIVA: could not cancel scheduled reminders');
+    return { status: 'cancelFailed' };
+  }
+  const plan = presentReminders(planReminders(state, todayLocal()), state.discreetNotifications !== false);
+  if (plan.length === 0) return { status: 'ok', scheduled: 0 };
+  let scheduled = 0;
+  try {
+    const perm = await Notifications.getPermissionsAsync();
+    if (!perm.granted) return { status: 'noPermission' };
+    await ensureChannel();
+    for (const r of plan) {
+      await Notifications.scheduleNotificationAsync({
+        identifier: r.id,
+        content: { title: r.title, body: r.body, data: { url: r.url } },
+        trigger: toTrigger(r.trigger),
+      });
+      scheduled++;
     }
-  });
-  return syncing;
+  } catch {
+    console.warn('VIVA: could not schedule reminders'); // never log the reminder text
+    return { status: 'scheduleFailed', scheduled, expected: plan.length };
+  }
+  return { status: 'ok', scheduled };
 }
 
 /** Cancel EVERY scheduled VIVA reminder and remove any already showing in the notification

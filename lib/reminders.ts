@@ -43,6 +43,18 @@ export const TIPS = [
   'Insights become more useful once you have logged a few complete cycles.',
 ];
 
+// ---- Discreet notifications: what the phone SHOWS (the plan above is never changed) ----
+
+export const DISCREET_TITLE = 'VIVA Cycle';
+export const DISCREET_BODY = 'You have a reminder. Open the app to view details.';
+
+/** The text each reminder will show. With discreet on, EVERY VIVA reminder (period, fertility,
+ *  ovulation, pregnancy wording, medication, tips, everything) shows only the neutral text, so
+ *  nothing on a lock screen hints at reproductive health. Same ids, triggers and tap targets. */
+export function presentReminders(plan: PlannedReminder[], discreet: boolean): PlannedReminder[] {
+  return discreet ? plan.map((r) => ({ ...r, title: DISCREET_TITLE, body: DISCREET_BODY })) : plan;
+}
+
 /** Everything that should be scheduled right now, given her saved data and switches. */
 export function planReminders(state: Pick<VivaState, 'baseline' | 'periods' | 'goal' | 'reminders'>, today: DateStr): PlannedReminder[] {
   const on = (k: ReminderKey) => !!state.reminders[k];

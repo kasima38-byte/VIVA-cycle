@@ -34,6 +34,7 @@ export interface VivaData {
   periods: PeriodLog[];  // confirmed periods, oldest → newest
   dailyLogs: Record<string, DailyLog>; // Daily Tracking entries by date
   reminders: Record<string, boolean>;  // Notification switches (all off until she turns one on)
+  discreetNotifications: boolean;      // reminders show neutral text only (on unless she turns it off)
 }
 
 export interface VivaState extends VivaData {
@@ -51,6 +52,7 @@ const EMPTY: VivaData = {
   periods: [],
   dailyLogs: {},
   reminders: {},
+  discreetNotifications: true,
 };
 
 let state: VivaState = { ...EMPTY, loaded: false, loadError: false };
@@ -221,6 +223,8 @@ function parseSaved(raw: string, extraLogs: Record<string, unknown> = {}): VivaD
       ...extraLogs,
     })),
     reminders: saved.reminders && typeof saved.reminders === 'object' && !Array.isArray(saved.reminders) ? saved.reminders : {},
+    // Saved before this setting existed (or unreadable): discreet, the private choice
+    discreetNotifications: typeof saved.discreetNotifications === 'boolean' ? saved.discreetNotifications : true,
     version: SCHEMA_VERSION,
   };
 }
@@ -456,6 +460,14 @@ export async function clearTrackingDataKeepPeriods(): Promise<boolean> {
     emit();
     return false;
   }
+}
+
+/** Discreet Notifications on or off. Separate from the reminder switches: it only changes the
+ *  text reminders show. Resolves true once it is saved on the phone (the screen goes back if not).
+ *  Scheduled reminders are rebuilt with lib/notifications.ts syncReminders(). */
+export function setDiscreetNotifications(on: boolean): Promise<boolean> {
+  if (state.discreetNotifications === on) return Promise.resolve(true);
+  return update({ discreetNotifications: on });
 }
 
 /** Turn one reminder on or off. */

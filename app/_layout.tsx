@@ -7,7 +7,7 @@ import { getVivaState, loadVivaStore, retryLoadVivaStore, useVivaStore } from '.
 import { loadTrackingSettings, useTrackingSettings } from '../lib/dailyTrackingSettingsService';
 
 export default function RootLayout() {
-  const { loaded, loadError, periods, baseline, goal, reminders } = useVivaStore();
+  const { loaded, loadError, periods, baseline, goal, reminders, discreetNotifications } = useVivaStore();
   const { loaded: settingsLoaded } = useTrackingSettings();
 
   useEffect(() => {
@@ -19,7 +19,7 @@ export default function RootLayout() {
   // Rebuild reminders whenever anything they depend on changes (and on every launch)
   useEffect(() => {
     if (loaded && !loadError) syncReminders(getVivaState());
-  }, [loaded, loadError, periods, baseline, goal, reminders]);
+  }, [loaded, loadError, periods, baseline, goal, reminders, discreetNotifications]);
 
   if (!loaded || !settingsLoaded) {
     return (

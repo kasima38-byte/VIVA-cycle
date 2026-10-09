@@ -5,12 +5,18 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import IntroCard from '../components/IntroCard';
+import VivaToggle from '../components/VivaToggle';
 import { colors, radius, spacing } from '../constants/theme';
-import { InfoItem, MANAGE_DATA, PERMISSIONS, PRIVACY_HEADER, YOUR_DATA } from '../lib/privacyContent';
+import { syncReminders } from '../lib/notifications';
+import {
+  DISCREET, DiscreetNotice, InfoItem, MANAGE_DATA, PERMISSIONS, PRIVACY_HEADER, YOUR_DATA, discreetNotice,
+} from '../lib/privacyContent';
 import { useDeleteAllData } from '../lib/useDeleteAllData';
+import { getVivaState, setDiscreetNotifications, useVivaStore } from '../lib/vivaStore';
 
 function InfoCard({ items }: { items: InfoItem[] }) {
   return (
@@ -42,6 +48,80 @@ function SectionHeading({ title, subtitle }: { title: string; subtitle: string }
         {title}
       </Text>
       <Text style={styles.sectionSubtitle}>{subtitle}</Text>
+    </View>
+  );
+}
+
+/** Discreet Notifications switch. Changing it saves the setting, then rebuilds the scheduled
+ *  reminders with the new text. It never asks for notification permission. */
+function DiscreetNotificationsCard() {
+  const { discreetNotifications } = useVivaStore();
+  const [notice, setNotice] = useState<DiscreetNotice | null>(null);
+  const busy = useRef(false);
+
+  const resync = async () => {
+    const result = await syncReminders(getVivaState());
+    setNotice(discreetNotice(true, result));
+  };
+
+  const change = async (next: boolean) => {
+    if (busy.current) return;
+    busy.current = true;
+    setNotice(null);
+    try {
+      const saved = await setDiscreetNotifications(next);
+      if (saved) await resync();
+      else setNotice(discreetNotice(false, null));
+    } finally {
+      busy.current = false;
+    }
+  };
+
+  return (
+    <View style={styles.section}>
+      <SectionHeading title={DISCREET.sectionTitle} subtitle={DISCREET.sectionSubtitle} />
+      <View style={styles.groupedCard}>
+        <Pressable
+          onPress={() => void change(!discreetNotifications)}
+          style={styles.toggleRow}
+          accessibilityRole="switch"
+          accessibilityLabel={DISCREET.title + '. ' + DISCREET.description}
+          accessibilityState={{ checked: discreetNotifications }}
+        >
+          <View style={styles.infoIcon}>
+            <Ionicons name="eye-off-outline" size={22} color={colors.magenta} />
+          </View>
+          <View style={styles.flex}>
+            <Text style={styles.infoTitle}>{DISCREET.title}</Text>
+            <Text style={styles.infoBody}>{DISCREET.description}</Text>
+          </View>
+          <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+            <VivaToggle value={discreetNotifications} onValueChange={(v) => void change(v)} />
+          </View>
+        </Pressable>
+      </View>
+      <Text style={styles.note}>{discreetNotifications ? DISCREET.onNote : DISCREET.offNote}</Text>
+      <Text style={styles.note}>{DISCREET.scope}</Text>
+      {notice && (
+        <View
+          style={notice.kind === 'error' ? styles.errorBox : styles.infoBox}
+          accessibilityLiveRegion={notice.kind === 'error' ? 'assertive' : 'polite'}
+        >
+          <Ionicons
+            name={notice.kind === 'error' ? 'alert-circle' : 'information-circle'}
+            size={18}
+            color={notice.kind === 'error' ? colors.magentaText : colors.navy}
+          />
+          <View style={styles.flex}>
+            <Text style={styles.errorBody}>{notice.text}</Text>
+            {notice.canRetry && (
+              <Pressable onPress={() => void resync()} accessibilityRole="button" hitSlop={8} style={styles.retry}>
+                <Text style={styles.retryText}>{DISCREET.retry}</Text>
+              </Pressable>
+            )}
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -98,6 +178,9 @@ export default function PrivacySecurityScreen() {
               <Text style={styles.outlineButtonText}>{PERMISSIONS.settingsButton}</Text>
             </Pressable>
           </View>
+
+          {/* ---------- Discreet Notifications ---------- */}
+          <DiscreetNotificationsCard />
 
           {/* ---------- C. Manage Your Data ---------- */}
           <View style={styles.section}>
@@ -177,6 +260,23 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
   infoDivider: { borderTopWidth: 1, borderTopColor: colors.border },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    minHeight: 72,
+    padding: spacing.lg,
+  },
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.sm,
+    backgroundColor: colors.lavender,
+  },
+  retry: { marginTop: 6, alignSelf: 'flex-start', minHeight: 32, justifyContent: 'center' },
+  retryText: { fontSize: 14.5, fontWeight: '700', color: colors.magentaText },
   infoIcon: {
     width: 44,
     height: 44,

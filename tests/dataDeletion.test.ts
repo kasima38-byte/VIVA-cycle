@@ -196,6 +196,7 @@ function ok(cond: unknown, what: string) {
     const d = new Date(Date.now() - 3 * 864e5);
     const recent = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     app.store.logPeriod(recent);
+    eq(await app.store.setDiscreetNotifications(false), true, 'show detailed reminders for this check');
     await settle();
     await app.notifications.syncReminders(app.store.getVivaState());
     const titles = notif.scheduled.map((n) => n.content.title + ' ' + n.content.body);
@@ -206,6 +207,7 @@ function ok(cond: unknown, what: string) {
     eq(r.remindersCancelled, true, 'remindersCancelled');
     eq(notif.scheduled, [], 'scheduled reminders');
     eq(notif.presented, [], 'reminders still showing');
+    eq(app.store.getVivaState().discreetNotifications, true, 'Discreet Notifications back to its default (on)');
     // The app's normal re-sync after deletion schedules nothing (all switches are off)
     await app.notifications.syncReminders(app.store.getVivaState());
     eq(notif.scheduled, [], 'reminders rescheduled after deletion');

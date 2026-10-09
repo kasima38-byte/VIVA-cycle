@@ -9,6 +9,8 @@
 //    and camera / photo library (app/personal-information.tsx, only when changing the photo).
 // If any of that changes, update this file AND tests/privacySecurity.test.ts.
 
+import type { ReminderSyncResult } from './notifications';
+
 export type InfoItem = {
   icon: 'phone-portrait-outline' | 'person-circle-outline' | 'lock-open-outline' | 'cloud-upload-outline'
     | 'notifications-outline' | 'camera-outline';
@@ -65,8 +67,8 @@ export const PERMISSIONS: { title: string; subtitle: string; items: InfoItem[]; 
       icon: 'notifications-outline',
       title: 'Notifications',
       body:
-        'Asked when you turn on a reminder. Reminders are scheduled on this phone. Their text, such as a period ' +
-        'or fertile-window estimate, may show on your lock screen.',
+        'Asked when you turn on a reminder. Reminders are scheduled on this phone and may show on your lock ' +
+        'screen. Discreet Notifications decides how much they say.',
     },
     {
       icon: 'camera-outline',
@@ -85,3 +87,45 @@ export const MANAGE_DATA = {
   deletingLabel: 'Deleting…',
   note: "You'll be asked to confirm twice. Nothing is deleted until you do. This can't be undone.",
 };
+
+export const DISCREET = {
+  sectionTitle: 'Notifications',
+  sectionSubtitle: 'What your reminders show.',
+  title: 'Discreet Notifications',
+  description: 'Hide sensitive details in VIVA Cycle notifications.',
+  onNote: 'On: every VIVA reminder only says "VIVA Cycle. You have a reminder." Open the app to see the details.',
+  offNote:
+    'Off: reminders can include details, such as estimated period or fertile-window dates, and may show on your ' +
+    'lock screen.',
+  scope: "This only changes reminder text. It doesn't hide anything inside the app once your phone is unlocked.",
+  retry: 'Try again',
+};
+
+export type DiscreetNotice = { kind: 'error' | 'info'; text: string; canRetry: boolean };
+
+/** What to tell her after the setting changes. Never says reminders were updated unless they were. */
+export function discreetNotice(saved: boolean, sync: ReminderSyncResult | null): DiscreetNotice | null {
+  if (!saved) return { kind: 'error', text: "We couldn't save this setting. Please try again.", canRetry: false };
+  if (!sync || sync.status === 'ok') return null;
+  if (sync.status === 'noPermission') {
+    return {
+      kind: 'info',
+      text: 'Setting saved. Notifications are turned off for VIVA Cycle in your phone settings, so no reminders will show.',
+      canRetry: false,
+    };
+  }
+  if (sync.status === 'cancelFailed') {
+    return {
+      kind: 'error',
+      text:
+        "Setting saved, but we couldn't update reminders that were already scheduled, so some may still show " +
+        'their old text. Try again, or turn off notifications for VIVA Cycle in your phone settings.',
+      canRetry: true,
+    };
+  }
+  return {
+    kind: 'error',
+    text: "Setting saved, but some of your reminders couldn't be scheduled again. Please try again.",
+    canRetry: true,
+  };
+}

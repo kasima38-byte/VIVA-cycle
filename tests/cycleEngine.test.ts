@@ -38,7 +38,7 @@ const logs = (...starts: string[]): PeriodLog[] => starts.map((start) => ({ star
 const est = (b: CycleBaseline, l: PeriodLog[], today: string) => calculateCycle(b, l, today)!;
 const viva = (b: CycleBaseline, l: PeriodLog[]): VivaState => ({
   loaded: true, loadError: false, version: 1, setupComplete: true, name: 'Sarah', dateOfBirth: null,
-  baseline: b, goal: 'conceive', periods: l, dailyLogs: {}, reminders: {},
+  baseline: b, goal: 'conceive', periods: l, dailyLogs: {}, reminders: {}, discreetNotifications: true,
 });
 const marked = (year: number, month: number, l: PeriodLog[], e: ReturnType<typeof est>, today: string,
   key: 'isPeriod' | 'isPredictedPeriod' | 'isFertile' | 'isOvulation' | 'isToday') =>
