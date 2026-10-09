@@ -95,8 +95,11 @@ const monthDay = (k: string) => monthOf(k) + ' ' + Number(k.slice(8, 10));
 const daysText = (n: number) => n + (n === 1 ? ' day' : ' days');
 const bleedingDaysLogged = (n: number) => n + (n === 1 ? ' bleeding day logged' : ' bleeding days logged');
 
-function formatAvg(v: number): string {
-  return Number.isInteger(v) ? String(v) : v.toFixed(1);
+/** Period Length display: round to 1 decimal for display only, then drop a trailing ".0".
+ *  3 -> "3 days", 2.96 -> "3 days", 3.5 -> "3.5 days", 3.67 -> "3.7 days", 1 -> "1 day". */
+export function formatDays(value: number): string {
+  const r = Math.round(value * 10) / 10;
+  return (Number.isInteger(r) ? String(r) : r.toFixed(1)) + (r === 1 ? ' day' : ' days');
 }
 
 export type PeriodLengthView = {
@@ -147,7 +150,7 @@ export function periodLengthView(all: PeriodRecord[], range: PeriodRangeKey, tod
     details,
     active,
     average,
-    averageText: average === null ? '—' : formatAvg(average) + (average === 1 ? ' day' : ' days'),
+    averageText: average === null ? '—' : formatDays(average),
     withinRange: status ? status.within : null,
     statusText: status ? status.text : active ? 'Tracking in progress' : 'No completed period data yet',
     subtitle: inRange.length > 0 ? 'Your logged bleeding days' : 'Tap bleeding days on the Calendar to track your period length.',

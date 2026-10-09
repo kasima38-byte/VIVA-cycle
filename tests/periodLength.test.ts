@@ -1,7 +1,7 @@
 // Period Length checks: Calendar bleeding days -> Insights bars + Average.
 // Uses made-up 2030 dates only - never real user data.
 // Run: npx -y tsx tests/periodLength.test.ts
-import { buildPeriodRecords, periodLengthView, PeriodRangeKey, periodDetailRows } from '../lib/periodLength';
+import { buildPeriodRecords, periodLengthView, PeriodRangeKey, periodDetailRows, formatDays } from '../lib/periodLength';
 import { bleedingMarks, derivePeriodLogs } from '../lib/periodTracking';
 import { calculateCycle, predictCycles } from '../lib/cycleEngine';
 
@@ -301,6 +301,12 @@ check('V1. Same month in two years -> every bar label gets a 2-digit year', () =
 
 check('V2. Unique months keep the short labels (no year)', () => {
   eq(bars(view(logs(HIST2), '12m', T)), ['Jul 4', 'Aug 4', 'Sep 3'], 'labels');
+});
+
+// ---------- Display format (W1) ----------
+check('W1. formatDays: whole numbers without .0, otherwise one decimal', () => {
+  eq([3, 3.0, 3.5, 3.67, 4, 2.96, 1].map(formatDays),
+    ['3 days', '3 days', '3.5 days', '3.7 days', '4 days', '3 days', '1 day'], 'formatted');
 });
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
