@@ -273,7 +273,10 @@ function eq(a: unknown, b: unknown, what: string) {
   await check('M10. Goal and regularity labels match the Cycle Settings screen', async () => {
     const { my } = await boot();
     const cs = read('app/cycle-settings.tsx');
-    for (const [k, v] of Object.entries(my.GOAL_LABELS)) ok(cs.includes(`{ key: '${k}', label: '${v}'`), 'goal ' + k);
+    // Goals: one shared list (lib/goals.ts) used by Cycle Settings and My Data
+    ok(/import \{ GOAL_OPTIONS, goalLabel \} from '..\/lib\/goals';/.test(cs), 'Cycle Settings uses the shared goal list');
+    const { GOAL_OPTIONS } = req('../lib/goals');
+    for (const o of GOAL_OPTIONS) eq(my.GOAL_LABELS[o.key], o.label, 'goal ' + o.key);
     for (const [k, v] of Object.entries(my.REGULARITY_LABELS)) ok(cs.includes(`{ key: '${k}', label: '${v}'`), 'regularity ' + k);
   });
 

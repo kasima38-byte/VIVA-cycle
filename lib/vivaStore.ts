@@ -18,6 +18,7 @@ import {
   isAppKey, isMonthKey, migrateRecord, serializeMonths,
 } from './dailyStorage';
 import { isValidDateKey } from '../constants/dateUtils';
+import { isGoal } from './goals';
 
 /** One day of Daily Tracking (her own entries). Full model: lib/dailyTracking.ts */
 export type DailyLog = DailyTrackingRecord;
@@ -223,6 +224,7 @@ function parseSaved(raw: string, extraLogs: Record<string, unknown> = {}): VivaD
       ...extraLogs,
     })),
     reminders: saved.reminders && typeof saved.reminders === 'object' && !Array.isArray(saved.reminders) ? saved.reminders : {},
+    goal: isGoal(saved.goal) ? saved.goal : null, // an unknown saved value is treated as "not set"
     // Saved before this setting existed (or unreadable): discreet, the private choice
     discreetNotifications: typeof saved.discreetNotifications === 'boolean' ? saved.discreetNotifications : true,
     version: SCHEMA_VERSION,
@@ -508,8 +510,13 @@ export function updateBaseline(patch: Partial<CycleBaseline>) {
   update({ baseline: { ...state.baseline, ...patch } });
 }
 
-export function setGoal(goal: Goal | null) {
-  update({ goal });
+/** Change her goal (Cycle Settings, My Health Goals). Only the goals in lib/goals.ts are accepted.
+ *  Changes wording and what Home shows; never touches period history or cycle calculations.
+ *  Resolves true only once it is saved on the phone (the screen goes back if not). */
+export function setGoal(goal: Goal | null): Promise<boolean> {
+  if (goal !== null && !isGoal(goal)) return Promise.resolve(false);
+  if (state.goal === goal) return Promise.resolve(true);
+  return update({ goal });
 }
 
 /** Personal details. Never affect cycle calculations. */

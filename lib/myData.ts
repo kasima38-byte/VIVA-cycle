@@ -7,15 +7,11 @@
 import type { Goal, Regularity } from './cycleEngine';
 import type { DailyTrackingSettings } from './dailyTrackingSettings';
 import { TRACKED_FIELDS } from './dailyTracking';
+import { GOAL_OPTIONS } from './goals';
 import type { DailyLog, VivaState } from './vivaStore';
 
-// Same labels as the Cycle Settings screen (tests/myData.test.ts checks they stay in step)
-export const GOAL_LABELS: Record<Goal, string> = {
-  understand: 'Understand my cycle',
-  track: 'Track my cycle',
-  conceive: 'Try to get pregnant',
-  avoid: 'Avoid pregnancy',
-};
+// Goal labels: the app's one list (lib/goals.ts), so they always match Cycle Settings
+export const GOAL_LABELS = Object.fromEntries(GOAL_OPTIONS.map((o) => [o.key, o.label])) as Record<Goal, string>;
 export const REGULARITY_LABELS: Record<Regularity, string> = {
   regular: 'Regular',
   somewhat_irregular: 'Somewhat irregular',

@@ -1,6 +1,7 @@
 import { formatLongDate } from './cycleData';
 import { calculateCycle, CycleEstimate, FertilityStatus, Goal, todayLocal } from '../lib/cycleEngine';
 import { VivaState } from '../lib/vivaStore';
+import { showsFertilityEstimatesOnHome } from '../lib/goals';
 
 type LateCopy = { label: string; explanation: string; message: string };
 
@@ -190,6 +191,7 @@ export function getHomeSummary(viva: VivaState, today: string = todayLocal()) {
       isLate: false,
       goal: viva.goal,
       goalNote: null,
+      showFertilityEstimates: showsFertilityEstimatesOnHome(viva.goal),
       ovulationIsVariable: false,
       fertileWindowStatus: 'upcoming' as const,
       regularity: viva.baseline.regularity,
@@ -244,6 +246,7 @@ export function getHomeSummary(viva: VivaState, today: string = todayLocal()) {
     isLate: est.isLate,
     goal: viva.goal,
     goalNote: goalGuidance(viva.goal, est),
+    showFertilityEstimates: showsFertilityEstimatesOnHome(viva.goal), // goal rule: lib/goals.ts
     phaseExplanation: copy.explanation,
     todayMessage: copy.message,
     todayNote: copy.note,

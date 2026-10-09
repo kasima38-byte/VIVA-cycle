@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import BottomSheet from '../components/BottomSheet';
+import { GOAL_OPTIONS, goalLabel } from '../lib/goals';
 import { colors, radius, spacing } from '../constants/theme';
 import { calculateCycle, Goal, Regularity } from '../lib/cycleEngine';
 import { useToday } from '../lib/useToday';
@@ -16,12 +17,7 @@ type Open = 'goal' | 'cycle' | 'period' | 'regularity' | null;
 const CYCLE_RANGE = { min: 21, max: 45, fallback: 28 };   // same as Welcome
 const PERIOD_RANGE = { min: 2, max: 10, fallback: 5 };    // same as Welcome
 
-const GOAL_OPTIONS: { key: Goal; label: string; detail: string }[] = [
-  { key: 'understand', label: 'Understand my cycle', detail: 'Learn how your cycle works.' },
-  { key: 'track', label: 'Track my cycle', detail: 'Keep a record of your periods and patterns.' },
-  { key: 'conceive', label: 'Try to get pregnant', detail: 'Focus on your estimated fertile window and timing.' },
-  { key: 'avoid', label: 'Avoid pregnancy', detail: 'Focus on days that may be fertile. Estimates are not contraception.' },
-];
+// Goal options: the app's one list (lib/goals.ts)
 
 const REGULARITY_OPTIONS: { key: Regularity; label: string; detail: string }[] = [
   { key: 'regular', label: 'Regular', detail: 'Your cycle length is usually about the same.' },
@@ -30,7 +26,6 @@ const REGULARITY_OPTIONS: { key: Regularity; label: string; detail: string }[] =
   { key: 'not_sure', label: 'Not sure', detail: 'That’s fine — logging periods will show your pattern.' },
 ];
 
-const goalLabel = (g: Goal | null) => GOAL_OPTIONS.find((o) => o.key === g)?.label ?? 'Not set';
 const regularityLabel = (r: Regularity) => REGULARITY_OPTIONS.find((o) => o.key === r)?.label ?? 'Not sure';
 const daysLabel = (n: number | null) => (n === null ? 'Not sure' : n + ' days');
 

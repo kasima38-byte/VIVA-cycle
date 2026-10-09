@@ -14,6 +14,7 @@ import { colors, spacing } from '../constants/theme';
 import { addDays, calculateCycle, CycleEstimate, diffDays } from '../lib/cycleEngine';
 import { useToday } from '../lib/useToday';
 import { useVivaStore } from '../lib/vivaStore';
+import { showsConceptionCard } from '../lib/goals';
 
 // Fertility — section 1: header, tabs and the estimated fertile window card.
 // Every date comes from lib/cycleEngine.ts and is presented as an ESTIMATE.
@@ -196,7 +197,9 @@ export default function FertilityScreen() {
           <OvulationSignsCard onPress={() => setActiveTab('Signs')} />
 
           {/* Section 5: practical, goal-labelled guidance */}
-          <TryingToConceiveCard onLearnMore={() => router.push('/conception-guide')} />
+          {showsConceptionCard(viva.goal) ? (
+            <TryingToConceiveCard onLearnMore={() => router.push('/conception-guide')} />
+          ) : null}
 
           {/* Section 6: calendar estimate vs. evidence about ovulation */}
           <ConfirmOvulationCard onLearnHow={() => router.push('/ovulation-tracking-guide')} />
